@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { ServiceAreaRow, ZipIndex } from "./geo";
 import type { Plan, RateRow } from "./rank";
 
 export type Meta = {
@@ -27,4 +28,6 @@ export const loadState = (state: string) => ({
   meta: load<Meta>(state, "meta.json"),
   plans: load<Plan[]>(state, "plans.json"),
   rates: load<RateRow[]>(state, "rates.json"),
+  serviceAreas: load<ServiceAreaRow[]>(state, "serviceAreas.json"),
+  zips: load<ZipIndex>(state, "zips.json"),
 });

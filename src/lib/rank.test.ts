@@ -5,7 +5,7 @@ const one = (age: number) => ({ adults: [age], children: [] as number[] });
 
 const base: Plan = {
   id: "A-01", baseId: "A", issuer: "X", name: "A", metal: "Silver",
-  variant: "Standard Silver On Exchange Plan", type: "PPO", hsa: false,
+  variant: "Standard Silver On Exchange Plan", type: "PPO", serviceAreaId: "S1", hsa: false,
   deductible: 1000, medicalDeductible: null, drugDeductible: null, moop: 6000,
   familyDeductible: 2000, familyMedicalDeductible: null, familyDrugDeductible: null, familyMoop: 12000,
   sbcBabyDeductible: 1000, sbcBabyCopay: 200, sbcBabyCoinsurance: 3000,
@@ -95,5 +95,13 @@ describe("households", () => {
   });
   it("drops a plan if any charged member has no rate", () => {
     expect(rankPlans([base], ratesFam, { household: { adults: [45, 50], children: [] }, area: 3, tobacco: false })).toHaveLength(0);
+  });
+});
+
+describe("service areas", () => {
+  it("drops plans whose service area does not cover the county", () => {
+    const opts = { household: one(45), area: 3, tobacco: false };
+    expect(rankPlans([base], rates, { ...opts, serviceAreaIds: new Set(["S1"]) })).toHaveLength(1);
+    expect(rankPlans([base], rates, { ...opts, serviceAreaIds: new Set(["S9"]) })).toHaveLength(0);
   });
 });

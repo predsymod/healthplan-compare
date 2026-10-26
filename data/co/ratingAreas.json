@@ -1,0 +1,84 @@
+{
+ "1": [
+  "Boulder"
+ ],
+ "2": [
+  "El Paso",
+  "Teller"
+ ],
+ "3": [
+  "Adams",
+  "Arapahoe",
+  "Broomfield",
+  "Clear Creek",
+  "Denver",
+  "Douglas",
+  "Elbert",
+  "Gilpin",
+  "Jefferson",
+  "Park"
+ ],
+ "4": [
+  "Larimer"
+ ],
+ "5": [
+  "Mesa"
+ ],
+ "6": [
+  "Weld"
+ ],
+ "7": [
+  "Pueblo"
+ ],
+ "8": [
+  "Alamosa",
+  "Baca",
+  "Bent",
+  "Chaffee",
+  "Cheyenne",
+  "Conejos",
+  "Costilla",
+  "Crowley",
+  "Custer",
+  "Fremont",
+  "Huerfano",
+  "Kiowa",
+  "Kit Carson",
+  "Las Animas",
+  "Lincoln",
+  "Logan",
+  "Mineral",
+  "Morgan",
+  "Otero",
+  "Phillips",
+  "Prowers",
+  "Rio Grande",
+  "Saguache",
+  "Sedgwick",
+  "Washington",
+  "Yuma"
+ ],
+ "9": [
+  "Archuleta",
+  "Delta",
+  "Dolores",
+  "Eagle",
+  "Garfield",
+  "Grand",
+  "Gunnison",
+  "Hinsdale",
+  "Jackson",
+  "La Plata",
+  "Lake",
+  "Moffat",
+  "Montezuma",
+  "Montrose",
+  "Ouray",
+  "Pitkin",
+  "Rio Blanco",
+  "Routt",
+  "San Juan",
+  "San Miguel",
+  "Summit"
+ ]
+}

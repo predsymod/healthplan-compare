@@ -1,4 +1,5 @@
 import { loadState } from "@/lib/data";
+import { lookupZip, pickCounty, serviceAreasFor } from "@/lib/geo";
 import {
   chargedAges,
   householdSize,
@@ -9,7 +10,7 @@ import {
   type Scenario,
 } from "@/lib/rank";
 
-type Search = { age?: string; spouse?: string; kids?: string; area?: string; tobacco?: string; sort?: string };
+type Search = { age?: string; spouse?: string; kids?: string; zip?: string; county?: string; tobacco?: string; sort?: string };
 
 const usd = (n: number | null) =>
   n === null ? "n/a" : n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -38,7 +39,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
     .map((k) => clamp(Number(k), 0, 25))
     .filter((k) => !Number.isNaN(k))
     .slice(0, 8);
-  const area = clamp(Number(sp.area ?? 3) || 3, 1, 9);
+  const zip = (sp.zip ?? "80202").replace(/\D/g, "").slice(0, 5);
   const tobacco = sp.tobacco === "on";
   const sort = (SCENARIOS.some((s) => s.key === sp.sort) ? sp.sort : "worst") as Scenario;
 
@@ -46,8 +47,17 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
   const size = householdSize(household);
   const charged = chargedAges(household).length;
 
-  const { meta, plans, rates } = loadState("co");
-  const rows = rankPlans(plans, rates, { household, area, tobacco });
+  const { meta, plans, rates, serviceAreas, zips } = loadState("co");
+  const zipCounties = lookupZip(zips, zip);
+  const county = zipCounties ? pickCounty(zipCounties, sp.county) : null;
+  const rows = county
+    ? rankPlans(plans, rates, {
+        household,
+        area: county.area,
+        tobacco,
+        serviceAreaIds: serviceAreasFor(serviceAreas, county.fips),
+      })
+    : [];
   const best = winners(rows);
   const sorted = sortBy(rows, sort);
   const shown = sorted.slice(0, 40);
@@ -57,7 +67,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       age: String(age),
       ...(spouse ? { spouse: String(spouse) } : {}),
       ...(kids.length ? { kids: kids.join(",") } : {}),
-      area: String(area),
+      zip,
+      ...(county ? { county: county.fips } : {}),
       ...(tobacco ? { tobacco: "on" } : {}),
       sort: s,
     }).toString();
@@ -88,20 +99,28 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
           <input name="kids" type="text" defaultValue={kids.join(", ")} placeholder="e.g. 4, 6, 8" />
         </label>
         <label>
-          Rating area
-          <select name="area" defaultValue={area}>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((a) => (
-              <option key={a} value={a}>Area {a}</option>
-            ))}
-          </select>
+          ZIP code
+          <input name="zip" type="text" inputMode="numeric" pattern="[0-9]{5}" maxLength={5} defaultValue={zip} />
         </label>
+        {zipCounties && zipCounties.length > 1 && (
+          <label>
+            County (this ZIP spans several)
+            <select name="county" defaultValue={county?.fips}>
+              {zipCounties.map((c) => (
+                <option key={c.fips} value={c.fips}>
+                  {c.name} ({Math.round(c.share * 100)}% of ZIP)
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="check"><input name="tobacco" type="checkbox" defaultChecked={tobacco} /> Tobacco user</label>
         <button type="submit">Compare plans</button>
       </form>
       <div className="muted small">
         Example:{" "}
-        <a href="?age=45&spouse=43&kids=4,6,8&area=3">you 45, spouse 43, three kids (4, 6, 8)</a> ·{" "}
-        <a href="?age=45&area=3">just you, 45</a>
+        <a href="?age=45&spouse=43&kids=4,6,8&zip=80134">you 45, spouse 43, three kids (4, 6, 8)</a> ·{" "}
+        <a href="?age=45&zip=80134">just you, 45</a>
       </div>
 
       <div className="household">
@@ -113,9 +132,19 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
         {size > 1
           ? `Family plan limits apply${charged < size ? `; only ${charged} are charged a premium (the plan charges for the three oldest children under 21)` : ""}.`
           : "Individual plan limits apply."}{" "}
-        {rows.length} plans available in Area {area}.
+        {county
+          ? `${rows.length} plans are sold in ${county.name} County (rating area ${county.area}).`
+          : ""}
       </div>
 
+      {!county && (
+        <div className="banner">
+          We don&apos;t recognise ZIP {zip || "(blank)"} as a Colorado ZIP. Enter a 5-digit Colorado ZIP to see plans.
+        </div>
+      )}
+
+      {county && (
+        <>
       <h2>Best plan for each kind of year</h2>
       <div className="muted small">The cheapest plan changes with how much care you use. Total cost for the year:</div>
       <div className="cards">
@@ -174,9 +203,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       {sorted.length > shown.length && (
         <div className="muted small">Showing the best {shown.length} of {sorted.length} plans for this sort.</div>
       )}
+        </>
+      )}
       <footer>
-        Data: {meta.source}, retrieved {meta.retrieved}. {meta.note} Rating area is chosen manually for now (ZIP
-        lookup is not built yet). For families, scenario care costs are for one family member and come from each plan&apos;s standard Summary of Benefits
+        Data: {meta.source}, retrieved {meta.retrieved}. {meta.note} ZIP-to-county uses Census ZIP areas, so a few ZIPs (P.O. boxes, new ZIPs) may not be found. For families, scenario care costs are for one family member and come from each plan&apos;s standard Summary of Benefits
         examples, not from your own care; family-wide care would cost more. Whether a family deductible is shared or per person varies by plan and is not modeled. Network breadth, drugs and doctors are not modeled. Green cells mark the
         cheapest plan in that column.
       </footer>

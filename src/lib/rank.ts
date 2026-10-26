@@ -6,6 +6,7 @@ export type Plan = {
   metal: string;
   variant: string;
   type: string;
+  serviceAreaId: string;
   hsa: boolean;
   deductible: number | null; // combined medical + drug, when integrated
   medicalDeductible: number | null;
@@ -91,7 +92,7 @@ export function householdSize(h: Household): number {
 export function rankPlans(
   plans: Plan[],
   rates: RateRow[],
-  opts: { household: Household; area: number; tobacco: boolean },
+  opts: { household: Household; area: number; tobacco: boolean; serviceAreaIds?: Set<string> },
 ): Ranked[] {
   const ages = chargedAges(opts.household);
   const family = householdSize(opts.household) > 1;
@@ -109,6 +110,7 @@ export function rankPlans(
   const out: Ranked[] = [];
   for (const plan of plans) {
     if (!plan.variant.startsWith("Standard") || plan.metal === "Catastrophic") continue;
+    if (opts.serviceAreaIds && !opts.serviceAreaIds.has(plan.serviceAreaId)) continue;
     const bands = byPlan.get(plan.baseId);
     if (!bands) continue;
     let monthly = 0;
