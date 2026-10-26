@@ -26,7 +26,7 @@ const SHORT: Record<Scenario, string> = {
   light: "Healthy year: premiums plus routine care (up to $500 per person, within the deductible).",
   condition: "One person manages a chronic condition (the plan's standard diabetes scenario, about $5,600 of care).",
   big: "One person has a baby or a similar large event (the plan's standard scenario, about $12,700 of care).",
-  worst: "Everything goes wrong: premiums plus the plan's maximum out-of-pocket limit.",
+  worst: "Everything goes wrong: premiums plus the plan's maximum out-of-pocket limit. In-network care only; out-of-network and uncovered services can cost more.",
 };
 
 export default async function Home({ searchParams }: { searchParams: Promise<Search> }) {
@@ -207,7 +207,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       )}
       <footer>
         Data: {meta.source}, retrieved {meta.retrieved}. {meta.note} ZIP-to-county uses Census ZIP areas, so a few ZIPs (P.O. boxes, new ZIPs) may not be found. For families, scenario care costs are for one family member and come from each plan&apos;s standard Summary of Benefits
-        examples, not from your own care; family-wide care would cost more. Whether a family deductible is shared or per person varies by plan and is not modeled. Network breadth, drugs and doctors are not modeled. Green cells mark the
+        examples, not from your own care; family-wide care would cost more. Whether a family deductible is shared or per person varies by plan and is not modeled. The out-of-pocket maximum covers in-network, covered care only. Network breadth, drugs and doctors are not modeled. Green cells mark the
         cheapest plan in that column.
       </footer>
     </main>
