@@ -14,6 +14,16 @@ Built for the Meta AI Developer Hackathon, Oct 26 to Nov 4, 2026. Everything in 
 - 2026-10-26: Next.js app, scenario-based ranking engine with tests, household sizing (spouse and up to 3 charged children, family deductible and out-of-pocket max).
 - 2026-10-26: ZIP lookup (Census ZIP-to-county, CMS county-to-rating-area) and county service-area filtering so only plans sold in the user's county are ranked.
 - 2026-10-26: Muse Spark explanation panel (server route, JSON-schema output, every quoted figure re-verified against plan data in code).
+- 2026-10-26: Agent interface: an intake decision tree (`src/lib/tree.ts`), income-band subsidy screening, and three tools (`next_question`, `rank_plans`, `compare_plans`) served as a remote MCP server at `/mcp` and as REST at `/api/engine/<tool>`.
+
+## Agent interface
+
+The engine can be driven by any agent that speaks MCP or HTTP. The tools hold no state: the agent passes the answers it has collected each call, and `next_question` says what to ask next (and stops for Medicare or Medicaid). Tool outputs carry the caveats and the exact numbers an agent may quote.
+
+- MCP: `POST /mcp` (streamable HTTP, JSON responses)
+- REST: `POST /api/engine/next_question`, `/rank_plans`, `/compare_plans`
+
+No API keys are used by these endpoints.
 
 ## Data
 

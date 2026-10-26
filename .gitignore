@@ -7,3 +7,4 @@ out/
 *.zip
 __pycache__/
 .vercel/
+tsconfig.tsbuildinfo

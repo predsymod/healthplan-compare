@@ -1,6 +1,6 @@
 import { loadState } from "./data";
-import { lookupZip, pickCounty, serviceAreasFor } from "./geo";
-import { rankPlans, type Household, type Ranked, SCENARIOS, type Scenario } from "./rank";
+import { rankFor } from "./engine";
+import { type Household, SCENARIOS, type Scenario } from "./rank";
 
 export type Search = {
   age?: string;
@@ -30,16 +30,7 @@ export function resolveQuery(sp: Search) {
   const sort = (SCENARIOS.some((s) => s.key === sp.sort) ? sp.sort : "worst") as Scenario;
   const household: Household = { adults: spouse ? [age, spouse] : [age], children: kids };
 
-  const { meta, plans, rates, serviceAreas, zips } = loadState("co");
-  const zipCounties = lookupZip(zips, zip);
-  const county = zipCounties ? pickCounty(zipCounties, sp.county) : null;
-  const rows: Ranked[] = county
-    ? rankPlans(plans, rates, {
-        household,
-        area: county.area,
-        tobacco,
-        serviceAreaIds: serviceAreasFor(serviceAreas, county.fips),
-      })
-    : [];
+  const { meta } = loadState("co");
+  const { counties: zipCounties, county, rows } = rankFor({ household, zip, countyFips: sp.county, tobacco });
   return { age, spouse, kids, zip, tobacco, sort, household, meta, zipCounties, county, rows };
 }
