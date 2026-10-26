@@ -1,5 +1,5 @@
 import { allow } from "@/lib/limit";
-import { agentGuide, callTool } from "@/lib/tools";
+import { apiDocs, callTool } from "@/lib/tools";
 
 // Plain REST version of the same tools, for agents and apps that do not speak MCP.
 export const runtime = "nodejs";
@@ -24,7 +24,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ tool: string }
 }
 
 export function GET(req: Request) {
-  return new Response(agentGuide(new URL(req.url).origin), {
+  return new Response(apiDocs(new URL(req.url).origin), {
     headers: { ...CORS, "Content-Type": "text/plain; charset=utf-8" },
   });
 }

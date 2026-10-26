@@ -55,26 +55,22 @@
   <p class="lead">The cheapest plan in a quiet year is rarely the cheapest in a bad one. This tool gives any AI assistant the Colorado plan data and a short set of questions, so it can show how your household's costs change from a light year to a worst case.</p>
   <p class="muted">Educational cost estimator for people under 65 buying their own ACA plan in Colorado. It does not recommend a plan and is not medical, financial or insurance advice.</p>
 
-  <div class="card" id="for-assistants" style="border-color: var(--accent)">
-    <strong>If you are an AI assistant reading this page:</strong> a user sent you here to help them understand their Colorado health plan options. Do not ask them to read this page or copy anything. Follow the full guide at <a href="llms.txt">llms.txt</a>. In short: POST JSON <code>{"answers":{}}</code> to <code>https://healthplan-compare.vercel.app/api/engine/next_question</code>, ask the user only the questions it returns, then call <code>rank_plans</code>. Quote only figures the tools return, never pick a plan for the user, pass on the caveats, and do not save their household details to memory.
-  </div>
-
   <h2>How to use it</h2>
   <div class="card">
-    <p style="margin-top:0">Ask an AI assistant that can browse the web and make web requests (tested with Muse), and include this link:</p>
-    <pre id="prompt">Help me understand my Colorado health plan options: https://predsymod.github.io/healthplan-compare/</pre>
+    <p style="margin-top:0">Ask an AI assistant that can call web tools (tested with Muse), and give it the tool link in your message:</p>
+    <pre id="prompt">Help me understand my Colorado health plan options using the tool at https://healthplan-compare.vercel.app/mcp</pre>
     <button type="button" data-copy="prompt">Copy</button>
     <span class="muted" role="status" aria-live="polite" data-done="prompt"></span>
   </div>
   <p class="muted" style="margin-top:12px">The first time, your assistant may ask permission to reach healthplan-compare.vercel.app; that is normal. No account or key is needed, and nothing is stored.</p>
   <ol class="steps card">
-    <li><strong>Ask your question and share this link.</strong> Your assistant reads the instructions on its own.</li>
+    <li><strong>Ask your question and include the tool link.</strong> Your assistant connects to the tool itself.</li>
     <li><strong>Answer a few questions.</strong> It asks only what it still needs: who is covered, your ZIP code, your income (optional, used to estimate your premium credit), and how much care you expect.</li>
     <li><strong>Read the tradeoffs.</strong> You get the best plan under five views of the year, a ranked list, and follow-up comparisons between plans you pick.</li>
   </ol>
 
   <details class="card" style="margin-top:12px">
-    <summary>If your assistant needs more detail, paste this longer prompt</summary>
+    <summary>If your assistant does not connect, try this longer prompt</summary>
     <pre id="prompt2" style="margin-top:10px">Connect to the tool server at https://healthplan-compare.vercel.app/mcp (MCP over HTTP: POST JSON-RPC, no login). Call initialize and tools/list, read the server instructions, then use only those tools to help me compare Colorado ACA health plans. Ask me only what the tool says it still needs. Quote dollar figures exactly as the tool returns them, and do not pick a plan for me.
 
 About me: I'm [age], my spouse is [age or none], my kids are [ages or none], and we live in ZIP [ZIP].</pre>
@@ -122,7 +118,7 @@ About me: I'm [age], my spouse is [age or none], my kids are [ages or none], and
   </div>
 
   <h2>For developers</h2>
-  <p>The tools hold no state: the assistant passes what it has learned each call. They are served as a remote MCP server and as plain REST.</p>
+  <p>A plain-text <a href="llms.txt">API description</a> is published alongside this page. The tools hold no state: the assistant passes what it has learned each call. They are served as a remote MCP server and as plain REST.</p>
   <div class="card">
     <pre>POST https://healthplan-compare.vercel.app/mcp
 POST https://healthplan-compare.vercel.app/api/engine/next_question

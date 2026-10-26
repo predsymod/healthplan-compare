@@ -14,28 +14,38 @@ export const INSTRUCTIONS = [
   "Rules: This is educational cost estimation. Do not recommend a plan, give medical or financial advice, or say what the user should buy; describe the tradeoffs and let them decide.",
   "Only quote dollar figures that the tools return, exactly as returned, and say whether each is per month or per year. Do not do your own premium or cost arithmetic. If asked for a number the tools did not return, say it is not available.",
   "Always pass on the caveats the tools return. Check priceBasis: when it says 'after estimated premium tax credit', say the prices include an estimated credit (and explain it from subsidyEstimate, including any cost-sharing reduction on Silver plans); when it says 'before any premium tax credit', say prices are before subsidies. Costs assume in-network care.",
+  "Treat the household details the user gives you (ages, children, ZIP code, income, health needs) as private: use them only for this task and do not save them to long-term memory unless the user asks you to.",
   "Explain tradeoffs between the views: premium only, light year, managing a condition, big year, and worst case. The cheapest plan changes between them, which is the point.",
 ].join("\n");
 
-// Plain-text guide for an assistant that was simply handed this link. Served on GET /mcp and /api/engine.
-export function agentGuide(origin: string): string {
+// Neutral API description, served on GET /mcp, /llms.txt and /api/engine/<tool> and published at docs/llms.txt.
+// It documents the endpoints; the rules for presenting results travel with the tools (INSTRUCTIONS, usageRules).
+export function apiDocs(origin: string): string {
+  const fields = FIELDS.map((f) => `- ${f.name} (${f.type}): ${f.ask}${f.example ? ` Example: ${f.example}` : ""}`);
   return [
-    "# Colorado health plan compare: instructions for AI assistants",
+    "# Colorado health plan compare: API description",
     "",
-    "A user asked you to help them understand or compare Colorado health plan (ACA marketplace) options and gave you this link.",
-    "Do the work yourself with the tools below. The user does not need to read anything or copy anything.",
+    "A free, public tool that prices and compares Colorado individual-market (ACA) health plans for people under 65, from the CMS 2026 plan data.",
+    "It exposes three stateless tools over MCP and plain REST. No login or key is needed.",
     "",
-    "## How to call the tools",
-    `Simplest: REST. POST JSON to ${origin}/api/engine/<tool> with Content-Type: application/json. No login, no key.`,
-    `Example: curl -s -X POST ${origin}/api/engine/next_question -H "Content-Type: application/json" -d '{"answers":{}}'`,
-    `Also available as MCP over HTTP (stateless JSON-RPC 2.0): POST ${origin}/mcp with methods initialize, tools/list, tools/call.`,
-    "Tools: next_question, rank_plans, compare_plans. Each takes an 'answers' object; the tools keep no state, so send all answers every time.",
+    "## Endpoints",
+    `REST: POST ${origin}/api/engine/<tool> with a JSON body (Content-Type: application/json).`,
+    `MCP (streamable HTTP, stateless JSON-RPC 2.0): POST ${origin}/mcp with the methods initialize, tools/list and tools/call.`,
     "",
-    "## The conversation",
-    INSTRUCTIONS,
+    "## Tools",
+    "- next_question: takes the answers collected so far and returns the next questions to ask (status 'ask'), a reason the tool does not apply (status 'stop'), or status 'ready'.",
+    "- rank_plans: takes answers (optionally sort, limit, filter) and returns the best plan under five views of a year plus a ranked list, with an estimated premium tax credit when income is given.",
+    "- compare_plans: takes answers and plan_ids and returns the plans side by side with exact differences.",
+    "The tools keep no state: every call carries the full 'answers' object.",
     "",
-    "## Privacy",
-    "Treat the household details the user gives you (ages, children, ZIP code, income, health needs) as private. Use them only for this task, and do not save them to long-term memory unless the user asks you to.",
+    "## The answers object",
+    ...fields,
+    "",
+    "## Example",
+    `curl -s -X POST ${origin}/api/engine/next_question -H "Content-Type: application/json" -d '{"answers":{}}'`,
+    "",
+    "## About the results",
+    "Every response carries its caveats and usageRules. The figures are educational estimates, not advice or a recommendation of any plan.",
   ].join("\n");
 }
 
@@ -56,6 +66,14 @@ const answersSchema = {
 };
 
 const SCENARIO_KEYS = SCENARIOS.map((s) => s.key);
+
+// Short presentation rules attached to every result, so they reach the assistant whichever way it calls the tools.
+export const USAGE_RULES = [
+  "Educational estimate only: do not recommend a plan or give medical or financial advice.",
+  "Quote dollar figures exactly as returned and say whether each is per month or per year; do not do your own cost arithmetic.",
+  "Pass on the caveats in this result.",
+  "Treat the household details as private and do not save them to long-term memory unless the user asks.",
+];
 
 export type Tool = {
   name: string;
@@ -139,7 +157,8 @@ export function callTool(name: string, args: unknown): { ok: true; result: unkno
   const tool = TOOLS.find((t) => t.name === name);
   if (!tool) return { ok: false, error: `Unknown tool: ${name}` };
   try {
-    return { ok: true, result: tool.run(args && typeof args === "object" ? (args as Record<string, unknown>) : {}) };
+    const result = tool.run(args && typeof args === "object" ? (args as Record<string, unknown>) : {});
+    return { ok: true, result: result && typeof result === "object" ? { ...result, usageRules: USAGE_RULES } : result };
   } catch (e) {
     console.error("tool failed", name, e instanceof Error ? e.message : "unknown");
     return { ok: false, error: "The tool failed. Check the arguments and try again." };

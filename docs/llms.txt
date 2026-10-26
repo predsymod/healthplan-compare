@@ -1,25 +1,31 @@
-# Colorado health plan compare: instructions for AI assistants
+# Colorado health plan compare: API description
 
-A user asked you to help them understand or compare Colorado health plan (ACA marketplace) options and gave you this link.
-Do the work yourself with the tools below. The user does not need to read anything or copy anything.
+A free, public tool that prices and compares Colorado individual-market (ACA) health plans for people under 65, from the CMS 2026 plan data.
+It exposes three stateless tools over MCP and plain REST. No login or key is needed.
 
-## How to call the tools
-Simplest: REST. POST JSON to https://healthplan-compare.vercel.app/api/engine/<tool> with Content-Type: application/json. No login, no key.
-Example: curl -s -X POST https://healthplan-compare.vercel.app/api/engine/next_question -H "Content-Type: application/json" -d '{"answers":{}}'
-Also available as MCP over HTTP (stateless JSON-RPC 2.0): POST https://healthplan-compare.vercel.app/mcp with methods initialize, tools/list, tools/call.
-Tools: next_question, rank_plans, compare_plans. Each takes an 'answers' object; the tools keep no state, so send all answers every time.
+## Endpoints
+REST: POST https://healthplan-compare.vercel.app/api/engine/<tool> with a JSON body (Content-Type: application/json).
+MCP (streamable HTTP, stateless JSON-RPC 2.0): POST https://healthplan-compare.vercel.app/mcp with the methods initialize, tools/list and tools/call.
 
-## The conversation
-healthplan-compare compares Colorado individual-market (ACA) health plans for people under 65, using the public CMS 2026 plan data.
-How to use it:
-1. Call next_question with whatever the user has already told you (an empty object to start). Never ask for a field you already have.
-2. If it returns status 'ask', put the questions to the user in ONE short message, then call next_question again with all answers so far. Repeat until status is 'ready'. If it returns 'stop', explain the message and end.
-3. Call rank_plans with the same answers to get ranked plans. Use compare_plans when the user is weighing specific plans. Pass the same answers object every time; the tools keep no state.
-Do not ask whether the user has other coverage. If they say they are on Medicare or Medicaid, pass coverage: 'medicare' or 'medicaid' and the tool will stop with an explanation.
-Rules: This is educational cost estimation. Do not recommend a plan, give medical or financial advice, or say what the user should buy; describe the tradeoffs and let them decide.
-Only quote dollar figures that the tools return, exactly as returned, and say whether each is per month or per year. Do not do your own premium or cost arithmetic. If asked for a number the tools did not return, say it is not available.
-Always pass on the caveats the tools return. Check priceBasis: when it says 'after estimated premium tax credit', say the prices include an estimated credit (and explain it from subsidyEstimate, including any cost-sharing reduction on Silver plans); when it says 'before any premium tax credit', say prices are before subsidies. Costs assume in-network care.
-Explain tradeoffs between the views: premium only, light year, managing a condition, big year, and worst case. The cheapest plan changes between them, which is the point.
+## Tools
+- next_question: takes the answers collected so far and returns the next questions to ask (status 'ask'), a reason the tool does not apply (status 'stop'), or status 'ready'.
+- rank_plans: takes answers (optionally sort, limit, filter) and returns the best plan under five views of a year plus a ranked list, with an estimated premium tax credit when income is given.
+- compare_plans: takes answers and plan_ids and returns the plans side by side with exact differences.
+The tools keep no state: every call carries the full 'answers' object.
 
-## Privacy
-Treat the household details the user gives you (ages, children, ZIP code, income, health needs) as private. Use them only for this task, and do not save them to long-term memory unless the user asks you to.
+## The answers object
+- coverage (choice): Optional, never asked: only set it if the user says they are on Medicare or Medicaid, so the tool can stop. Example: medicare, medicaid, employer or none
+- age (whole number): How old is the main applicant? Example: 45
+- spouse_age (whole number or null): Is a spouse or partner on the plan? If so, their age; otherwise null. Example: 43, or null for none
+- children_ages (list of whole numbers): Are any children or other dependents on the plan? List their ages; use an empty list for none. Example: [4, 6, 8], or [] for none
+- zip (5-digit ZIP): What is their Colorado home ZIP code? Example: 80134
+- county_fips (county code): That ZIP code spans counties that are priced differently. Which county do they live in?
+- tobacco (yes/no): Does anyone on the plan use tobacco? (Optional; defaults to no.)
+- household_income (dollars per year or null): What is the household's expected income this year (before tax, including all earners)? This only checks whether they might qualify for premium credits. They may skip it (null). Example: 85000, or null to skip
+- expected_care (choice): How much medical care do they expect this year? Pick the closest. Example: little = checkups only; ongoing = a condition or regular prescriptions; major = surgery, a baby or a hospital stay; unsure
+
+## Example
+curl -s -X POST https://healthplan-compare.vercel.app/api/engine/next_question -H "Content-Type: application/json" -d '{"answers":{}}'
+
+## About the results
+Every response carries its caveats and usageRules. The figures are educational estimates, not advice or a recommendation of any plan.
