@@ -13,7 +13,7 @@ export const INSTRUCTIONS = [
   "Do not ask whether the user has other coverage. If they say they are on Medicare or Medicaid, pass coverage: 'medicare' or 'medicaid' and the tool will stop with an explanation.",
   "Rules: This is educational cost estimation. Do not recommend a plan, give medical or financial advice, or say what the user should buy; describe the tradeoffs and let them decide.",
   "Only quote dollar figures that the tools return, exactly as returned, and say whether each is per month or per year. Do not do your own premium or cost arithmetic. If asked for a number the tools did not return, say it is not available.",
-  "Always pass on the caveats the tools return, especially that premiums are before subsidies and that costs assume in-network care.",
+  "Always pass on the caveats the tools return. Check priceBasis: when it says 'after estimated premium tax credit', say the prices include an estimated credit (and explain it from subsidyEstimate, including any cost-sharing reduction on Silver plans); when it says 'before any premium tax credit', say prices are before subsidies. Costs assume in-network care.",
   "Explain tradeoffs between the views: premium only, light year, managing a condition, big year, and worst case. The cheapest plan changes between them, which is the point.",
 ].join("\n");
 
@@ -67,7 +67,7 @@ export const TOOLS: Tool[] = [
   {
     name: "rank_plans",
     description:
-      "Ranks Colorado plans sold in the household's county by yearly cost under five views: premium only, light year, managing a condition, big year and worst case. Returns the best plan for each view and a ranked list led by the view that matches the user's expected care. If the intake is not finished it returns the next question instead. Optional filter narrows by metal level, plan type, insurer, HSA eligibility or maximum monthly premium.",
+      "Ranks Colorado plans sold in the household's county by yearly cost under five views: premium only, light year, managing a condition, big year and worst case. Returns the best plan for each view and a ranked list led by the view that matches the user's expected care. When household_income is in the premium-credit range it also estimates the 2026 premium tax credit and returns prices after it (plus before-credit figures). If the intake is not finished it returns the next question instead. Optional filter narrows by metal level, plan type, insurer, HSA eligibility or maximum monthly premium.",
     inputSchema: {
       type: "object",
       properties: {

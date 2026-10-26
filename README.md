@@ -15,6 +15,7 @@ Built for the Meta AI Developer Hackathon, Oct 26 to Nov 4, 2026. Everything in 
 - 2026-10-26: ZIP lookup (Census ZIP-to-county, CMS county-to-rating-area) and county service-area filtering so only plans sold in the user's county are ranked.
 - 2026-10-26: Muse Spark explanation panel (server route, JSON-schema output, every quoted figure re-verified against plan data in code).
 - 2026-10-26: Agent interface: an intake decision tree (`src/lib/tree.ts`), income-band subsidy screening, and three tools (`next_question`, `rank_plans`, `compare_plans`) served as a remote MCP server at `/mcp` and as REST at `/api/engine/<tool>`.
+- 2026-10-26: Premium tax credit estimate (benchmark Silver minus expected contribution, using the 2026 table in IRS Rev. Proc. 2025-25, checked against the IRS text) and Silver cost-sharing-reduction variants for incomes up to 250% of poverty.
 
 ## Agent interface
 

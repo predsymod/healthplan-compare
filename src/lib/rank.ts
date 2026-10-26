@@ -66,6 +66,8 @@ export type Ranked = {
   moop: number;
   monthly: number;
   totals: Record<Scenario, number | null>;
+  // Set when an estimated premium tax credit has been applied: monthly and totals are then after the credit.
+  credit?: { annual: number; grossMonthly: number; grossTotals: Record<Scenario, number | null> };
 };
 
 export function ageBand(age: number): string {
@@ -92,7 +94,14 @@ export function householdSize(h: Household): number {
 export function rankPlans(
   plans: Plan[],
   rates: RateRow[],
-  opts: { household: Household; area: number; tobacco: boolean; serviceAreaIds?: Set<string> },
+  opts: {
+    household: Household;
+    area: number;
+    tobacco: boolean;
+    serviceAreaIds?: Set<string>;
+    // When set, Silver plans are shown as their cost-sharing-reduction variant (73, 87 or 94) instead of Standard.
+    csr?: 73 | 87 | 94;
+  },
 ): Ranked[] {
   const ages = chargedAges(opts.household);
   const family = householdSize(opts.household) > 1;
@@ -109,7 +118,10 @@ export function rankPlans(
 
   const out: Ranked[] = [];
   for (const plan of plans) {
-    if (!plan.variant.startsWith("Standard") || plan.metal === "Catastrophic") continue;
+    if (plan.metal === "Catastrophic") continue;
+    const wanted =
+      opts.csr && plan.metal === "Silver" ? plan.variant.startsWith(`${opts.csr}% AV`) : plan.variant.startsWith("Standard");
+    if (!wanted) continue;
     if (opts.serviceAreaIds && !opts.serviceAreaIds.has(plan.serviceAreaId)) continue;
     const bands = byPlan.get(plan.baseId);
     if (!bands) continue;

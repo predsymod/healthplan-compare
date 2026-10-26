@@ -2,11 +2,11 @@ import { loadState } from "./data";
 import { lookupZip, pickCounty, serviceAreasFor } from "./geo";
 import { planLabel } from "./format";
 import { householdSize, rankPlans, SCENARIOS, sortBy, type Household, type Ranked, type Scenario } from "./rank";
-import { screenSubsidy, type SubsidyScreen } from "./subsidy";
+import { estimateCredit, screenSubsidy, type SubsidyScreen } from "./subsidy";
 import { nextStep, type Answers, type Care } from "./tree";
 
 // Prices every standard plan sold in the household's county. Used by the web page and by the agent tools.
-export function rankFor(h: { household: Household; zip: string; countyFips?: string; tobacco: boolean }) {
+export function rankFor(h: { household: Household; zip: string; countyFips?: string; tobacco: boolean; csr?: 73 | 87 | 94 }) {
   const { zips, plans, rates, serviceAreas } = loadState("co");
   const counties = lookupZip(zips, h.zip);
   const county = counties ? pickCounty(counties, h.countyFips) : null;
@@ -16,12 +16,15 @@ export function rankFor(h: { household: Household; zip: string; countyFips?: str
         area: county.area,
         tobacco: h.tobacco,
         serviceAreaIds: serviceAreasFor(serviceAreas, county.fips),
+        csr: h.csr,
       })
     : [];
   return { counties, county, rows };
 }
 
 const whole = (n: number | null) => (n === null ? null : Math.round(n));
+const wholeAll = (t: Record<Scenario, number | null>) =>
+  ({ premium: whole(t.premium), light: whole(t.light), condition: whole(t.condition), big: whole(t.big), worst: whole(t.worst) }) as Record<Scenario, number | null>;
 
 export type PlanSummary = {
   id: string;
@@ -29,39 +32,46 @@ export type PlanSummary = {
   insurer: string;
   metal: string;
   type: string;
+  costSharingVariant: string | null;
   hsaEligible: boolean;
   monthlyPremium: number;
+  monthlyPremiumBeforeCredit: number;
+  estimatedMonthlyCredit: number;
   deductible: number;
   maxOutOfPocket: number;
   perYear: Record<Scenario, number | null>;
+  perYearBeforeCredit: Record<Scenario, number | null>;
 };
 
-export const summarize = (r: Ranked): PlanSummary => ({
-  id: r.plan.id,
-  name: planLabel(r.plan),
-  insurer: r.plan.issuer,
-  metal: r.plan.metal,
-  type: r.plan.type,
-  hsaEligible: r.plan.hsa,
-  monthlyPremium: Math.round(r.monthly),
-  deductible: Math.round(r.deductible),
-  maxOutOfPocket: Math.round(r.moop),
-  perYear: {
-    premium: whole(r.totals.premium),
-    light: whole(r.totals.light),
-    condition: whole(r.totals.condition),
-    big: whole(r.totals.big),
-    worst: whole(r.totals.worst),
-  },
-});
+export const summarize = (r: Ranked): PlanSummary => {
+  const csr = /^(\d+)% AV/.exec(r.plan.variant);
+  return {
+    id: r.plan.id,
+    name: planLabel(r.plan),
+    insurer: r.plan.issuer,
+    metal: r.plan.metal,
+    type: r.plan.type,
+    costSharingVariant: csr ? `${csr[1]}% cost-sharing reduction` : null,
+    hsaEligible: r.plan.hsa,
+    monthlyPremium: Math.round(r.monthly),
+    monthlyPremiumBeforeCredit: Math.round(r.credit?.grossMonthly ?? r.monthly),
+    estimatedMonthlyCredit: Math.round((r.credit?.annual ?? 0) / 12),
+    deductible: Math.round(r.deductible),
+    maxOutOfPocket: Math.round(r.moop),
+    perYear: wholeAll(r.totals),
+    perYearBeforeCredit: wholeAll(r.credit?.grossTotals ?? r.totals),
+  };
+};
 
 export const SCENARIO_MEANING: Record<Scenario, string> = Object.fromEntries(
   SCENARIOS.map((s) => [s.key, `${s.label}: ${s.help}`]),
 ) as Record<Scenario, string>;
 
-const CAVEATS = [
+const caveats = (credited: boolean) => [
   "These are estimates for educational use, not advice or a recommendation of any plan.",
-  "Premiums are before any premium tax credit or Colorado state subsidy.",
+  credited
+    ? "Prices are after an ESTIMATED premium tax credit. The real credit depends on final modified adjusted gross income, any job-based coverage offer, and who is on the tax return, and it is settled when you file taxes. Colorado state subsidies are not included."
+    : "Premiums are before any premium tax credit or Colorado state subsidy.",
   "Costs assume in-network, covered care. Out-of-network care and uncovered services can cost more.",
   "Care scenarios (light, condition, big year) describe one person. If several family members have care, costs rise toward the worst case.",
   "No doctors, hospitals or prescriptions are checked against plan networks or drug lists.",
@@ -95,6 +105,72 @@ function householdOf(a: Answers): Household {
   return { adults: a.spouse_age ? [a.age!, a.spouse_age] : [a.age!], children: a.children_ages ?? [] };
 }
 
+export type SubsidyEstimate = {
+  benchmarkPlan: string;
+  benchmarkMonthlyPremium: number;
+  applicablePercent: number;
+  expectedMonthlyContribution: number;
+  estimatedMonthlyCredit: number;
+  costSharingReduction: { level: number; note: string } | null;
+  howItWorks: string;
+};
+
+type Priced = {
+  county: ReturnType<typeof rankFor>["county"];
+  rows: Ranked[];
+  screen: SubsidyScreen | null;
+  estimate: SubsidyEstimate | null;
+};
+
+// Prices the household. With an income in the credit range it also estimates the premium tax credit, applies it
+// to every plan, and swaps Silver plans for their cost-sharing-reduction variant where the household qualifies.
+function priced(a: Answers): Priced {
+  const household = householdOf(a);
+  const tobacco = a.tobacco ?? false;
+  const args = { household, zip: a.zip!, countyFips: a.county_fips, tobacco };
+  const plain = rankFor(args);
+  const size = householdSize(household);
+  const screen = typeof a.household_income === "number" ? screenSubsidy(a.household_income, size) : null;
+  if (!a.household_income || screen?.band !== "subsidy_range") return { county: plain.county, rows: plain.rows, screen, estimate: null };
+
+  // The benchmark is the second-lowest-cost Silver plan, priced without any tobacco surcharge.
+  const base = tobacco ? rankFor({ ...args, tobacco: false }).rows : plain.rows;
+  const silvers = base.filter((r) => r.plan.metal === "Silver").sort((x, y) => x.monthly - y.monthly);
+  const bench = silvers[1] ?? silvers[0];
+  const est = bench ? estimateCredit(a.household_income, size, bench.totals.premium!) : null;
+  if (!bench || !est) return { county: plain.county, rows: plain.rows, screen, estimate: null };
+
+  const shown = est.csr ? rankFor({ ...args, csr: est.csr }).rows : plain.rows;
+  const rows = shown.map((r): Ranked => {
+    const c = Math.min(est.annualCredit, r.totals.premium ?? 0);
+    const net = Object.fromEntries(
+      Object.entries(r.totals).map(([k, v]) => [k, v === null ? null : v - c]),
+    ) as Record<Scenario, number | null>;
+    return { ...r, monthly: r.monthly - c / 12, totals: net, credit: { annual: c, grossMonthly: r.monthly, grossTotals: r.totals } };
+  });
+
+  return {
+    county: plain.county,
+    rows,
+    screen,
+    estimate: {
+      benchmarkPlan: planLabel(bench.plan),
+      benchmarkMonthlyPremium: Math.round(bench.monthly),
+      applicablePercent: est.applicablePercent,
+      expectedMonthlyContribution: Math.round(est.expectedAnnualContribution / 12),
+      estimatedMonthlyCredit: Math.round(est.annualCredit / 12),
+      costSharingReduction: est.csr
+        ? {
+            level: est.csr,
+            note: `At this income, Silver plans come with extra cost-sharing reductions (${est.csr}% actuarial value): lower deductibles and out-of-pocket limits. The Silver plans listed are those versions. Bronze and Gold plans do not get them.`,
+          }
+        : null,
+      howItWorks:
+        "Estimated credit = the benchmark premium (second-lowest-cost Silver plan in the county for this household) minus an expected contribution of the applicable percentage of income (2026 table, IRS Rev. Proc. 2025-25). The credit can lower any plan's premium, but never below zero.",
+    },
+  };
+}
+
 export type RankResult = {
   household: { adults: number[]; children: number[]; size: number };
   location: { zip: string; county: string; ratingArea: number };
@@ -102,7 +178,9 @@ export type RankResult = {
   source: string;
   plansAvailable: number;
   plansMatching: number;
+  priceBasis: "after estimated premium tax credit" | "before any premium tax credit";
   subsidyScreen: SubsidyScreen | null;
+  subsidyEstimate: SubsidyEstimate | null;
   leadWith: { scenario: Scenario; meaning: string };
   bestBy: Record<string, PlanSummary | null>;
   plans: PlanSummary[];
@@ -119,8 +197,7 @@ export function rankResults(
   const step = nextStep(raw);
   if (step.status !== "ready") return step;
   const a = step.collected;
-  const household = householdOf(a);
-  const { county, rows } = rankFor({ household, zip: a.zip!, countyFips: a.county_fips, tobacco: a.tobacco ?? false });
+  const { county, rows, screen, estimate } = priced(a);
   const { meta } = loadState("co");
   const lead = HEADLINE[a.expected_care ?? "unsure"];
   const sortKey = opts.sort ?? lead;
@@ -132,6 +209,7 @@ export function rankResults(
     const top = sortBy(matching, s.key)[0];
     bestBy[s.key] = top ? summarize(top) : null;
   }
+  const household = householdOf(a);
 
   return {
     status: "ready",
@@ -142,12 +220,14 @@ export function rankResults(
       source: meta.source,
       plansAvailable: rows.length,
       plansMatching: matching.length,
-      subsidyScreen: typeof a.household_income === "number" ? screenSubsidy(a.household_income, householdSize(household)) : null,
+      priceBasis: estimate ? "after estimated premium tax credit" : "before any premium tax credit",
+      subsidyScreen: screen,
+      subsidyEstimate: estimate,
       leadWith: { scenario: sortKey, meaning: SCENARIO_MEANING[sortKey] },
       bestBy,
       plans: sortBy(matching, sortKey).slice(0, limit).map(summarize),
       scenarioMeanings: SCENARIO_MEANING,
-      caveats: [...CAVEATS, meta.note].filter(Boolean),
+      caveats: [...caveats(!!estimate), meta.note].filter(Boolean),
       assumptions: step.assumptions,
     },
   };
@@ -157,8 +237,7 @@ export function rankResults(
 export function comparePlans(raw: unknown, planIds: string[]) {
   const step = nextStep(raw);
   if (step.status !== "ready") return step;
-  const a = step.collected;
-  const { rows } = rankFor({ household: householdOf(a), zip: a.zip!, countyFips: a.county_fips, tobacco: a.tobacco ?? false });
+  const { rows, estimate } = priced(step.collected);
   const byId = new Map(rows.map((r) => [r.plan.id, r]));
   const found = planIds.map((id) => byId.get(id)).filter((r): r is Ranked => !!r);
   const missing = planIds.filter((id) => !byId.has(id));
@@ -178,10 +257,11 @@ export function comparePlans(raw: unknown, planIds: string[]) {
     : [];
   return {
     status: "ready" as const,
+    priceBasis: estimate ? "after estimated premium tax credit" : "before any premium tax credit",
     plans,
     differences,
     unknownPlanIds: missing,
     note: "Differences are the second plan minus the first plan; positive means it costs more.",
-    caveats: CAVEATS,
+    caveats: caveats(!!estimate),
   };
 }
