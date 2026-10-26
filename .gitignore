@@ -8,3 +8,5 @@ out/
 __pycache__/
 .vercel/
 tsconfig.tsbuildinfo
+
+.vercel

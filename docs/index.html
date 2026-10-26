@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colorado Plan Compare for AI assistants</title>
+<meta name="description" content="Point your AI assistant at this tool and it will compare Colorado ACA health plans for your household, asking only what it needs and quoting only checked numbers.">
+<style>
+  :root {
+    --bg: #fbfaf7; --fg: #1d2330; --muted: #5d6676; --card: #ffffff; --line: #e3e0d8;
+    --accent: #1f5fbf; --accent-bg: #e8f0fc; --good: #1d7a46; --code: #f1efe9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171d; --fg: #e8eaf0; --muted: #a0a8b6; --card: #1c2028; --line: #2c323d;
+      --accent: #7aa8f0; --accent-bg: #1f2a3d; --good: #5bc58a; --code: #232832;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 12px; }
+  h2 { font-size: 1.25rem; margin: 40px 0 12px; }
+  p { margin: 0 0 12px; }
+  .lead { font-size: 1.15rem; color: var(--muted); }
+  .muted { color: var(--muted); font-size: .92rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; counter-reset: s; }
+  .steps li { counter-increment: s; padding-left: 44px; position: relative; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent-bg); color: var(--accent); font-weight: 700; display: grid; place-items: center; }
+  pre { margin: 0; white-space: pre-wrap; word-break: break-word; background: var(--code); border-radius: 8px; padding: 12px; font: .9rem/1.5 ui-monospace, Consolas, monospace; }
+  button { font: inherit; background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; margin-top: 10px; }
+  button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--accent); }
+  .chat { display: grid; gap: 8px; }
+  .msg { padding: 10px 12px; border-radius: 12px; max-width: 92%; }
+  .you { background: var(--accent-bg); justify-self: end; }
+  .bot { background: var(--code); }
+  .tag { font-size: .78rem; color: var(--muted); margin-bottom: 2px; }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .grid2 { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 600px) { .grid2 { grid-template-columns: 1fr; } h1 { font-size: 1.6rem; } }
+  .yes::before { content: "\2713  "; color: var(--good); font-weight: 700; }
+  .no::before { content: "\2717  "; color: var(--muted); font-weight: 700; }
+  ul.plain { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Compare Colorado health plans by asking your AI assistant</h1>
+  <p class="lead">The cheapest plan in a quiet year is rarely the cheapest in a bad one. This tool gives any AI assistant the Colorado plan data and a short set of questions, so it can show how your household's costs change from a light year to a worst case.</p>
+  <p class="muted">Educational cost estimator for people under 65 buying their own ACA plan in Colorado. It does not recommend a plan and is not medical, financial or insurance advice.</p>
+
+  <h2>How to use it</h2>
+  <ol class="steps card">
+    <li><strong>Copy the prompt below</strong> and paste it into an AI assistant that can call web tools. It was tested with Muse.</li>
+    <li><strong>Answer a few questions.</strong> The assistant asks only what it still needs: who is covered, your ZIP code, an income range (optional), and how much care you expect.</li>
+    <li><strong>Read the tradeoffs.</strong> You get the best plan under five views of the year, a ranked list, and follow-up comparisons between plans you pick.</li>
+  </ol>
+
+  <h2>Prompt to paste</h2>
+  <div class="card">
+    <pre id="prompt">Connect to the tool server at https://healthplan-compare.vercel.app/mcp (MCP over HTTP: POST JSON-RPC, no login). Call initialize and tools/list, read the server instructions, then use only those tools to help me compare Colorado ACA health plans. Ask me only what the tool says it still needs. Quote dollar figures exactly as the tool returns them, and do not pick a plan for me.
+
+About me: I'm [age], my spouse is [age or none], my kids are [ages or none], and we live in ZIP [ZIP].</pre>
+    <button type="button" id="copy">Copy prompt</button>
+    <span class="muted" id="copied" role="status" aria-live="polite"></span>
+  </div>
+  <p class="muted" style="margin-top:12px">The first time, your assistant may ask permission to reach healthplan-compare.vercel.app. Nothing is stored, and no account or key is needed.</p>
+
+  <h2>What a conversation looks like</h2>
+  <div class="card chat" aria-label="Example conversation">
+    <div class="msg you"><div class="tag">You</div>I'm 45, my wife is 43, we have three kids aged 4, 6 and 8, and we live in ZIP 80134.</div>
+    <div class="msg bot"><div class="tag">Assistant</div>What is your household's expected income this year, before tax? You can skip it.</div>
+    <div class="msg you"><div class="tag">You</div>About $90,000.</div>
+    <div class="msg bot"><div class="tag">Assistant</div>How much medical care do you expect this year: little, ongoing, major, or unsure?</div>
+    <div class="msg you"><div class="tag">You</div>Ongoing. One of us has a condition with regular prescriptions.</div>
+    <div class="msg bot"><div class="tag">Assistant</div>Here are the top 5 plans for a year with a managed condition, and how the best plan changes in a big year or worst case. I can't pick one for you, and the tool doesn't check your doctors or prescriptions, so confirm those on Connect for Health Colorado.</div>
+  </div>
+  <p class="muted" style="margin-top:8px">Summarised from a real test run in Muse. In that run, every plan figure the assistant quoted matched the tool's output.</p>
+
+  <h2>The five views of a year</h2>
+  <div class="card" style="overflow-x:auto">
+    <table>
+      <tr><th>View</th><th>What it adds to the yearly premium</th></tr>
+      <tr><td>Premium only</td><td>Nothing</td></tr>
+      <tr><td>Light year</td><td>Routine care, up to $500 per person of the deductible</td></tr>
+      <tr><td>Managing a condition</td><td>The plan's standard diabetes-care scenario (about $5,600 of care)</td></tr>
+      <tr><td>Big year</td><td>The plan's standard having-a-baby scenario (about $12,700 of care)</td></tr>
+      <tr><td>Worst case</td><td>The plan's out-of-pocket maximum</td></tr>
+    </table>
+  </div>
+
+  <h2>What it does and doesn't do</h2>
+  <div class="grid2">
+    <div class="card"><ul class="plain">
+      <li class="yes">Prices every standard plan sold in your county</li>
+      <li class="yes">Handles spouses and up to three charged children</li>
+      <li class="yes">Screens income for possible premium credits</li>
+      <li class="yes">Gives exact differences between plans</li>
+    </ul></div>
+    <div class="card"><ul class="plain">
+      <li class="no">Does not recommend a plan</li>
+      <li class="no">Does not estimate the credit amount yet; prices are before subsidies</li>
+      <li class="no">Does not check doctors, hospitals or drug lists</li>
+      <li class="no">Assumes in-network, covered care</li>
+    </ul></div>
+  </div>
+
+  <h2>For developers</h2>
+  <p>The tools hold no state: the assistant passes what it has learned each call. They are served as a remote MCP server and as plain REST.</p>
+  <div class="card">
+    <pre>POST https://healthplan-compare.vercel.app/mcp
+POST https://healthplan-compare.vercel.app/api/engine/next_question
+POST https://healthplan-compare.vercel.app/api/engine/rank_plans
+POST https://healthplan-compare.vercel.app/api/engine/compare_plans</pre>
+  </div>
+  <p class="muted" style="margin-top:12px">Data: CMS State-based Exchange QHP public use file for Colorado, plan year 2026, with ZIP lookup from Census and CMS rating-area tables. It does not reflect state subsidies. Source code and contribution log: <a href="https://github.com/predsymod/healthplan-compare">github.com/predsymod/healthplan-compare</a>. Built for the Meta Global AI Developer Hackathon.</p>
+</main>
+<script>
+  document.getElementById("copy").addEventListener("click", function () {
+    var text = document.getElementById("prompt").textContent;
+    var done = function (msg) { document.getElementById("copied").textContent = " " + msg; };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done("Copied."); }, function () { done("Select the text and copy it."); });
+    } else { done("Select the text and copy it."); }
+  });
+</script>
+</body>
+</html>
