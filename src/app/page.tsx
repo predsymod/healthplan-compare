@@ -1,25 +1,7 @@
-import { loadState } from "@/lib/data";
-import { lookupZip, pickCounty, serviceAreasFor } from "@/lib/geo";
-import {
-  chargedAges,
-  householdSize,
-  rankPlans,
-  sortBy,
-  winners,
-  SCENARIOS,
-  type Scenario,
-} from "@/lib/rank";
-
-type Search = { age?: string; spouse?: string; kids?: string; zip?: string; county?: string; tobacco?: string; sort?: string };
-
-const usd = (n: number | null) =>
-  n === null ? "n/a" : n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-
-// Plan names often already start with the insurer name; avoid saying it twice.
-const planLabel = (p: { issuer: string; name: string }) =>
-  p.name.toLowerCase().startsWith(p.issuer.toLowerCase()) ? p.name : `${p.issuer} · ${p.name}`;
-
-const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+import ExplainPanel from "./ExplainPanel";
+import { planLabel, usd } from "@/lib/format";
+import { resolveQuery, type Search } from "@/lib/query";
+import { chargedAges, householdSize, sortBy, winners, SCENARIOS, type Scenario } from "@/lib/rank";
 
 const SHORT: Record<Scenario, string> = {
   premium: "Just the premiums, no care costs.",
@@ -31,33 +13,9 @@ const SHORT: Record<Scenario, string> = {
 
 export default async function Home({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
-  const age = clamp(Number(sp.age ?? 45) || 45, 18, 64);
-  const spouse = sp.spouse?.trim() ? clamp(Number(sp.spouse) || 0, 18, 64) : null;
-  const kids = (sp.kids ?? "")
-    .split(/[\s,]+/)
-    .filter(Boolean)
-    .map((k) => clamp(Number(k), 0, 25))
-    .filter((k) => !Number.isNaN(k))
-    .slice(0, 8);
-  const zip = (sp.zip ?? "80202").replace(/\D/g, "").slice(0, 5);
-  const tobacco = sp.tobacco === "on";
-  const sort = (SCENARIOS.some((s) => s.key === sp.sort) ? sp.sort : "worst") as Scenario;
-
-  const household = { adults: spouse ? [age, spouse] : [age], children: kids };
+  const { age, spouse, kids, zip, tobacco, sort, household, meta, zipCounties, county, rows } = resolveQuery(sp);
   const size = householdSize(household);
   const charged = chargedAges(household).length;
-
-  const { meta, plans, rates, serviceAreas, zips } = loadState("co");
-  const zipCounties = lookupZip(zips, zip);
-  const county = zipCounties ? pickCounty(zipCounties, sp.county) : null;
-  const rows = county
-    ? rankPlans(plans, rates, {
-        household,
-        area: county.area,
-        tobacco,
-        serviceAreaIds: serviceAreasFor(serviceAreas, county.fips),
-      })
-    : [];
   const best = winners(rows);
   const sorted = sortBy(rows, sort);
   const shown = sorted.slice(0, 40);
@@ -160,6 +118,18 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
           );
         })}
       </div>
+
+      <ExplainPanel
+        key={`${zip}-${county?.fips}-${age}-${spouse}-${kids.join(",")}-${tobacco}`}
+        query={{
+          age: String(age),
+          ...(spouse ? { spouse: String(spouse) } : {}),
+          kids: kids.join(","),
+          zip,
+          ...(county ? { county: county.fips } : {}),
+          ...(tobacco ? { tobacco: "on" } : {}),
+        }}
+      />
 
       <h2>
         All plans <span className="muted small">sorted by {SCENARIOS.find((s) => s.key === sort)?.label.toLowerCase()} (click a column to re-sort)</span>

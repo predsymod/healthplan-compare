@@ -13,6 +13,7 @@ Built for the Meta AI Developer Hackathon, Oct 26 to Nov 4, 2026. Everything in 
 - 2026-10-26: Colorado data build script (`scripts/build_co_data.py`), bundled 2026 plan data from the CMS State-Based Exchange QHP PUF (`data/co/`).
 - 2026-10-26: Next.js app, scenario-based ranking engine with tests, household sizing (spouse and up to 3 charged children, family deductible and out-of-pocket max).
 - 2026-10-26: ZIP lookup (Census ZIP-to-county, CMS county-to-rating-area) and county service-area filtering so only plans sold in the user's county are ranked.
+- 2026-10-26: Muse Spark explanation panel (server route, JSON-schema output, every quoted figure re-verified against plan data in code).
 
 ## Data
 
