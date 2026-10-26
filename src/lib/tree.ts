@@ -53,9 +53,9 @@ export const FIELDS: FieldDef[] = [
   {
     name: "coverage",
     type: "choice",
-    ask: "Do they currently have, or could they get, coverage from a job, Medicare or Medicaid? Or are they buying on their own?",
+    ask: "Optional, never asked: only set it if the user says they are on Medicare or Medicaid, so the tool can stop.",
     allowed: [...COVERAGE],
-    example: "none = buying on their own; employer = a job offers coverage; medicare; medicaid",
+    example: "medicare, medicaid, employer or none",
     parse: oneOf(COVERAGE),
   },
   {
@@ -178,12 +178,6 @@ type Node = { id: string; title: string; instruction: string; fields: (keyof Ans
 
 export const NODES: Node[] = [
   {
-    id: "coverage",
-    title: "Is this the right tool?",
-    instruction: "Check the person is buying their own under-65 plan. Skip the question if they already said.",
-    fields: ["coverage"],
-  },
-  {
     id: "household",
     title: "Who needs coverage, and where?",
     instruction: "Collect everyone in one message, and take anything the user already said instead of asking again.",
@@ -236,8 +230,7 @@ export function nextStep(raw: unknown): Step {
     };
   };
 
-  // coverage
-  if (a.coverage === undefined) return ask("coverage", ["coverage"]);
+  // The tool is for under-65 ACA shoppers, so coverage is never asked; it only matters if the user volunteers it.
   if (a.coverage === "medicare" || a.coverage === "medicaid") {
     return {
       status: "stop",

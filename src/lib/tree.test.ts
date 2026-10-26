@@ -6,10 +6,9 @@ const base = { coverage: "none", age: 45, spouse_age: 43, children_ages: [4, 6, 
 const full = { ...base, household_income: 90000, expected_care: "ongoing" };
 
 describe("intake tree", () => {
-  it("starts by asking about coverage", () => {
+  it("starts with the household and never asks about coverage", () => {
     const s = nextStep({});
-    expect(s.status).toBe("ask");
-    if (s.status === "ask") expect(s.questions.map((q) => q.field)).toEqual(["coverage"]);
+    expect(s.status === "ask" && s.questions.map((q) => q.field)).toEqual(["age", "spouse_age", "children_ages", "zip"]);
   });
 
   it("stops for Medicare and Medicaid", () => {
