@@ -17,6 +17,28 @@ export const INSTRUCTIONS = [
   "Explain tradeoffs between the views: premium only, light year, managing a condition, big year, and worst case. The cheapest plan changes between them, which is the point.",
 ].join("\n");
 
+// Plain-text guide for an assistant that was simply handed this link. Served on GET /mcp and /api/engine.
+export function agentGuide(origin: string): string {
+  return [
+    "# Colorado health plan compare: instructions for AI assistants",
+    "",
+    "A user asked you to help them understand or compare Colorado health plan (ACA marketplace) options and gave you this link.",
+    "Do the work yourself with the tools below. The user does not need to read anything or copy anything.",
+    "",
+    "## How to call the tools",
+    `Simplest: REST. POST JSON to ${origin}/api/engine/<tool> with Content-Type: application/json. No login, no key.`,
+    `Example: curl -s -X POST ${origin}/api/engine/next_question -H "Content-Type: application/json" -d '{"answers":{}}'`,
+    `Also available as MCP over HTTP (stateless JSON-RPC 2.0): POST ${origin}/mcp with methods initialize, tools/list, tools/call.`,
+    "Tools: next_question, rank_plans, compare_plans. Each takes an 'answers' object; the tools keep no state, so send all answers every time.",
+    "",
+    "## The conversation",
+    INSTRUCTIONS,
+    "",
+    "## Privacy",
+    "Treat the household details the user gives you (ages, children, ZIP code, income, health needs) as private. Use them only for this task, and do not save them to long-term memory unless the user asks you to.",
+  ].join("\n");
+}
+
 const answersSchema = {
   type: "object",
   description:

@@ -43,6 +43,8 @@
   .grid2 { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
   @media (max-width: 600px) { .grid2 { grid-template-columns: 1fr; } h1 { font-size: 1.6rem; } }
   .yes::before { content: "\2713  "; color: var(--good); font-weight: 700; }
+  details summary { cursor: pointer; font-weight: 600; }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
   .no::before { content: "\2717  "; color: var(--muted); font-weight: 700; }
   ul.plain { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
 </style>
@@ -53,22 +55,32 @@
   <p class="lead">The cheapest plan in a quiet year is rarely the cheapest in a bad one. This tool gives any AI assistant the Colorado plan data and a short set of questions, so it can show how your household's costs change from a light year to a worst case.</p>
   <p class="muted">Educational cost estimator for people under 65 buying their own ACA plan in Colorado. It does not recommend a plan and is not medical, financial or insurance advice.</p>
 
+  <div class="card" id="for-assistants" style="border-color: var(--accent)">
+    <strong>If you are an AI assistant reading this page:</strong> a user sent you here to help them understand their Colorado health plan options. Do not ask them to read this page or copy anything. Follow the full guide at <a href="llms.txt">llms.txt</a>. In short: POST JSON <code>{"answers":{}}</code> to <code>https://healthplan-compare.vercel.app/api/engine/next_question</code>, ask the user only the questions it returns, then call <code>rank_plans</code>. Quote only figures the tools return, never pick a plan for the user, pass on the caveats, and do not save their household details to memory.
+  </div>
+
   <h2>How to use it</h2>
+  <div class="card">
+    <p style="margin-top:0">Ask an AI assistant that can browse the web and make web requests (tested with Muse), and include this link:</p>
+    <pre id="prompt">Help me understand my Colorado health plan options: https://predsymod.github.io/healthplan-compare/</pre>
+    <button type="button" data-copy="prompt">Copy</button>
+    <span class="muted" role="status" aria-live="polite" data-done="prompt"></span>
+  </div>
+  <p class="muted" style="margin-top:12px">The first time, your assistant may ask permission to reach healthplan-compare.vercel.app; that is normal. No account or key is needed, and nothing is stored.</p>
   <ol class="steps card">
-    <li><strong>Copy the prompt below</strong> and paste it into an AI assistant that can call web tools. It was tested with Muse.</li>
-    <li><strong>Answer a few questions.</strong> The assistant asks only what it still needs: who is covered, your ZIP code, your income (optional, used to estimate your premium credit), and how much care you expect.</li>
+    <li><strong>Ask your question and share this link.</strong> Your assistant reads the instructions on its own.</li>
+    <li><strong>Answer a few questions.</strong> It asks only what it still needs: who is covered, your ZIP code, your income (optional, used to estimate your premium credit), and how much care you expect.</li>
     <li><strong>Read the tradeoffs.</strong> You get the best plan under five views of the year, a ranked list, and follow-up comparisons between plans you pick.</li>
   </ol>
 
-  <h2>Prompt to paste</h2>
-  <div class="card">
-    <pre id="prompt">Connect to the tool server at https://healthplan-compare.vercel.app/mcp (MCP over HTTP: POST JSON-RPC, no login). Call initialize and tools/list, read the server instructions, then use only those tools to help me compare Colorado ACA health plans. Ask me only what the tool says it still needs. Quote dollar figures exactly as the tool returns them, and do not pick a plan for me.
+  <details class="card" style="margin-top:12px">
+    <summary>If your assistant needs more detail, paste this longer prompt</summary>
+    <pre id="prompt2" style="margin-top:10px">Connect to the tool server at https://healthplan-compare.vercel.app/mcp (MCP over HTTP: POST JSON-RPC, no login). Call initialize and tools/list, read the server instructions, then use only those tools to help me compare Colorado ACA health plans. Ask me only what the tool says it still needs. Quote dollar figures exactly as the tool returns them, and do not pick a plan for me.
 
 About me: I'm [age], my spouse is [age or none], my kids are [ages or none], and we live in ZIP [ZIP].</pre>
-    <button type="button" id="copy">Copy prompt</button>
-    <span class="muted" id="copied" role="status" aria-live="polite"></span>
-  </div>
-  <p class="muted" style="margin-top:12px">The first time, your assistant may ask permission to reach healthplan-compare.vercel.app. Nothing is stored, and no account or key is needed.</p>
+    <button type="button" data-copy="prompt2">Copy prompt</button>
+    <span class="muted" role="status" aria-live="polite" data-done="prompt2"></span>
+  </details>
 
   <h2>What a conversation looks like</h2>
   <div class="card chat" aria-label="Example conversation">
@@ -120,12 +132,16 @@ POST https://healthplan-compare.vercel.app/api/engine/compare_plans</pre>
   <p class="muted" style="margin-top:12px">Data: CMS State-based Exchange QHP public use file for Colorado, plan year 2026, with ZIP lookup from Census and CMS rating-area tables. It does not reflect state subsidies. Source code and contribution log: <a href="https://github.com/predsymod/healthplan-compare">github.com/predsymod/healthplan-compare</a>. Built for the Meta Global AI Developer Hackathon.</p>
 </main>
 <script>
-  document.getElementById("copy").addEventListener("click", function () {
-    var text = document.getElementById("prompt").textContent;
-    var done = function (msg) { document.getElementById("copied").textContent = " " + msg; };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function () { done("Copied."); }, function () { done("Select the text and copy it."); });
-    } else { done("Select the text and copy it."); }
+  document.querySelectorAll("[data-copy]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var id = btn.getAttribute("data-copy");
+      var text = document.getElementById(id).textContent;
+      var out = document.querySelector('[data-done="' + id + '"]');
+      var done = function (msg) { out.textContent = " " + msg; };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done("Copied."); }, function () { done("Select the text and copy it."); });
+      } else { done("Select the text and copy it."); }
+    });
   });
 </script>
 </body>

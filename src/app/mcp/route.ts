@@ -1,5 +1,5 @@
 import { allow } from "@/lib/limit";
-import { callTool, INSTRUCTIONS, TOOLS } from "@/lib/tools";
+import { agentGuide, callTool, INSTRUCTIONS, TOOLS } from "@/lib/tools";
 
 // Remote MCP server (streamable HTTP, stateless JSON responses). No secrets are used here.
 export const runtime = "nodejs";
@@ -64,8 +64,11 @@ export async function POST(req: Request) {
   return Response.json(batch ? replies : replies[0], { headers: CORS });
 }
 
-export function GET() {
-  return new Response("This is an MCP endpoint. Send JSON-RPC with POST.", { status: 405, headers: { ...CORS, Allow: "POST" } });
+// A plain GET (for example an assistant that was handed this URL) gets the usage guide instead of an error.
+export function GET(req: Request) {
+  return new Response(agentGuide(new URL(req.url).origin), {
+    headers: { ...CORS, "Content-Type": "text/plain; charset=utf-8" },
+  });
 }
 
 export function OPTIONS() {
