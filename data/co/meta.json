@@ -1,0 +1,9 @@
+{
+  "state": "CO",
+  "exchange": "Connect for Health Colorado",
+  "planYear": "2026",
+  "source": "https://www.cms.gov/files/zip/coloradosbepuf2026.zip",
+  "retrieved": "2026-10-26",
+  "plans": 323,
+  "note": "CMS SBE data excludes Colorado state subsidies (Colorado Premium Assistance)."
+}

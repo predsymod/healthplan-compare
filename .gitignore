@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+.env
+.env.*
+!.env.example
+*.zip
+__pycache__/
+.vercel/
