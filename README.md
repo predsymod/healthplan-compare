@@ -11,6 +11,7 @@ Scope: individual-market ACA plans, under-65, non-Medicaid.
 Built for the Meta AI Developer Hackathon, Oct 26 to Nov 4, 2026. Everything in this repo was created in that window; see the commit history.
 
 - 2026-10-26: Colorado data build script (`scripts/build_co_data.py`), bundled 2026 plan data from the CMS State-Based Exchange QHP PUF (`data/co/`).
+- 2026-10-26: Next.js app, scenario-based ranking engine with tests, household sizing (spouse and up to 3 charged children, family deductible and out-of-pocket max).
 
 ## Data
 

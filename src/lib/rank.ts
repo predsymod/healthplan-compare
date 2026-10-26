@@ -11,6 +11,10 @@ export type Plan = {
   medicalDeductible: number | null;
   drugDeductible: number | null;
   moop: number;
+  familyDeductible: number | null;
+  familyMedicalDeductible: number | null;
+  familyDrugDeductible: number | null;
+  familyMoop: number | null;
   sbcBabyDeductible: number | null;
   sbcBabyCopay: number | null;
   sbcBabyCoinsurance: number | null;
@@ -53,9 +57,12 @@ export const SCENARIOS: { key: Scenario; label: string; help: string }[] = [
   },
 ];
 
+export type Household = { adults: number[]; children: number[] };
+
 export type Ranked = {
   plan: Plan;
   deductible: number;
+  moop: number;
   monthly: number;
   totals: Record<Scenario, number | null>;
 };
@@ -69,27 +76,60 @@ export function ageBand(age: number): string {
 const sum = (...xs: (number | null)[]): number | null =>
   xs.some((x) => x === null) ? null : (xs as number[]).reduce((a, b) => a + b, 0);
 
+// ACA rating: every adult is rated by age. Children under 21 are rated by age too,
+// but only the three oldest are charged. A dependent aged 21+ is rated as an adult.
+export function chargedAges(h: Household): number[] {
+  const under21 = h.children.filter((a) => a < 21).sort((a, b) => b - a).slice(0, 3);
+  const grownKids = h.children.filter((a) => a >= 21);
+  return [...h.adults, ...grownKids, ...under21];
+}
+
+export function householdSize(h: Household): number {
+  return h.adults.length + h.children.length;
+}
+
 export function rankPlans(
   plans: Plan[],
   rates: RateRow[],
-  opts: { age: number; area: number; tobacco: boolean },
+  opts: { household: Household; area: number; tobacco: boolean },
 ): Ranked[] {
-  const band = ageBand(opts.age);
-  const monthlyById = new Map<string, number>();
+  const ages = chargedAges(opts.household);
+  const family = householdSize(opts.household) > 1;
+  const members = Math.max(1, householdSize(opts.household));
+
+  const byPlan = new Map<string, Map<string, number>>();
   for (const r of rates) {
-    if (r.area !== opts.area || r.age !== band) continue;
+    if (r.area !== opts.area) continue;
     const m = opts.tobacco && r.tobaccoRate != null ? r.tobaccoRate : r.rate;
-    if (!monthlyById.has(r.baseId)) monthlyById.set(r.baseId, m);
+    let bands = byPlan.get(r.baseId);
+    if (!bands) byPlan.set(r.baseId, (bands = new Map()));
+    if (!bands.has(r.age)) bands.set(r.age, m);
   }
 
   const out: Ranked[] = [];
   for (const plan of plans) {
     if (!plan.variant.startsWith("Standard") || plan.metal === "Catastrophic") continue;
-    const monthly = monthlyById.get(plan.baseId);
-    if (monthly === undefined) continue;
+    const bands = byPlan.get(plan.baseId);
+    if (!bands) continue;
+    let monthly = 0;
+    let complete = true;
+    for (const a of ages) {
+      const r = bands.get(ageBand(a));
+      if (r === undefined) complete = false;
+      else monthly += r;
+    }
+    if (!complete) continue;
+
     const premium = monthly * 12;
-    const deductible =
+    const individualDed =
       plan.deductible ?? (plan.medicalDeductible ?? 0) + (plan.drugDeductible ?? 0);
+    const familyDed =
+      plan.familyDeductible ??
+      (plan.familyMedicalDeductible ?? 0) + (plan.familyDrugDeductible ?? 0);
+    const deductible = family && familyDed > 0 ? familyDed : family ? individualDed * 2 : individualDed;
+    const moop = family ? (plan.familyMoop ?? plan.moop * 2) : plan.moop;
+
+    // Scenario care is for one person; the per-person limit applies to them.
     const cap = (oop: number | null) => (oop === null ? null : Math.min(oop, plan.moop));
     const baby = cap(sum(plan.sbcBabyDeductible, plan.sbcBabyCopay, plan.sbcBabyCoinsurance));
     const diabetes = cap(
@@ -98,13 +138,14 @@ export function rankPlans(
     out.push({
       plan,
       deductible,
+      moop,
       monthly,
       totals: {
         premium,
-        light: premium + Math.min(deductible, 500),
+        light: premium + Math.min(deductible, 500 * members),
         condition: diabetes === null ? null : premium + diabetes,
         big: baby === null ? null : premium + baby,
-        worst: premium + plan.moop,
+        worst: premium + moop,
       },
     });
   }

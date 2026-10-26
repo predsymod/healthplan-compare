@@ -40,6 +40,12 @@ def money(s: pd.Series) -> pd.Series:
     return pd.to_numeric(s.str.replace(r"[$,]", "", regex=True), errors="coerce")
 
 
+def group_money(s: pd.Series) -> pd.Series:
+    """Family cells look like '$5500 per person | $11000 per group'; keep the group amount."""
+    grp = s.str.extract(r"\|\s*\$?([\d,]+)\s*per group")[0]
+    return money(grp.fillna(s))
+
+
 def read(z: zipfile.ZipFile, marker: str) -> pd.DataFrame:
     name = next(n for n in z.namelist() if marker in n)
     return pd.read_csv(z.open(name), dtype=str)
@@ -72,6 +78,10 @@ def main() -> None:
             "medicalDeductible": money(plans["MEHB DED INN TIER1 INDIVIDUAL"]),
             "drugDeductible": money(plans["DEHB DED INN TIER1 INDIVIDUAL"]),
             "moop": money(plans["TEHB INN TIER 1 INDIVIDUAL MOOP"]),
+            "familyDeductible": group_money(plans["TEHB DED INN TIER 1 FAMILY"]),
+            "familyMedicalDeductible": group_money(plans["MEHB DED INN TIER1 FAMILY"]),
+            "familyDrugDeductible": group_money(plans["DEHB DED INN TIER1 FAMILY"]),
+            "familyMoop": group_money(plans["TEHB INN TIER 1 FAMILY MOOP"]),
             "sbcBabyDeductible": money(plans["SBC HAVING A BABY DEDUCTIBLE"]),
             "sbcBabyCopay": money(plans["SBC HAVING A BABY COPAYMENT"]),
             "sbcBabyCoinsurance": money(plans["SBC HAVING A BABY COINSURANCE"]),
