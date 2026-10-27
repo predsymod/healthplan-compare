@@ -1,4 +1,3 @@
-import ExplainPanel from "./ExplainPanel";
 import { planLabel, usd } from "@/lib/format";
 import { resolveQuery, type Search } from "@/lib/query";
 import { chargedAges, householdSize, sortBy, winners, SCENARIOS, type Scenario } from "@/lib/rank";
@@ -77,8 +76,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
       </form>
       <div className="muted small">
         Example:{" "}
-        <a href="?age=45&spouse=43&kids=4,6,8&zip=80134">you 45, spouse 43, three kids (4, 6, 8)</a> ·{" "}
-        <a href="?age=45&zip=80134">just you, 45</a>
+        <a href="?age=40&spouse=38&kids=5,7,9&zip=80202">you 40, spouse 38, three kids (5, 7, 9)</a> ·{" "}
+        <a href="?age=40&zip=80202">just you, 40</a>
       </div>
 
       <div className="household">
@@ -118,18 +117,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<Sea
           );
         })}
       </div>
-
-      <ExplainPanel
-        key={`${zip}-${county?.fips}-${age}-${spouse}-${kids.join(",")}-${tobacco}`}
-        query={{
-          age: String(age),
-          ...(spouse ? { spouse: String(spouse) } : {}),
-          kids: kids.join(","),
-          zip,
-          ...(county ? { county: county.fips } : {}),
-          ...(tobacco ? { tobacco: "on" } : {}),
-        }}
-      />
 
       <h2>
         All plans <span className="muted small">sorted by {SCENARIOS.find((s) => s.key === sort)?.label.toLowerCase()} (click a column to re-sort)</span>

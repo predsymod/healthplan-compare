@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { loadState } from "./data";
 import { countyChoices, nextStep } from "./tree";
 
-const base = { coverage: "none", age: 45, spouse_age: 43, children_ages: [4, 6, 8], zip: "80134" };
+const base = { coverage: "none", age: 40, spouse_age: 38, children_ages: [5, 7, 9], zip: "80202" };
 const full = { ...base, household_income: 90000, expected_care: "ongoing" };
 
 describe("intake tree", () => {
@@ -17,7 +17,7 @@ describe("intake tree", () => {
   });
 
   it("stops for someone 65 or older", () => {
-    const s = nextStep({ coverage: "none", age: 66, spouse_age: null, children_ages: [], zip: "80134" });
+    const s = nextStep({ coverage: "none", age: 66, spouse_age: null, children_ages: [], zip: "80202" });
     expect(s.status).toBe("stop");
   });
 
@@ -27,7 +27,7 @@ describe("intake tree", () => {
   });
 
   it("does not ask again for what it already has", () => {
-    const s = nextStep({ coverage: "none", age: 45, zip: "80134" });
+    const s = nextStep({ coverage: "none", age: 45, zip: "80202" });
     expect(s.status === "ask" && s.questions.map((q) => q.field)).toEqual(["spouse_age", "children_ages"]);
   });
 
@@ -46,7 +46,7 @@ describe("intake tree", () => {
   });
 
   it("accepts children as a comma string", () => {
-    const s = nextStep({ ...full, children_ages: "4, 6, 8" });
+    const s = nextStep({ ...full, children_ages: "5, 7, 9" });
     expect(s.status).toBe("ready");
   });
 

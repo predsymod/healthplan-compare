@@ -102,7 +102,7 @@ export const FIELDS: FieldDef[] = [
     name: "zip",
     type: "5-digit ZIP",
     ask: "What is their Colorado home ZIP code?",
-    example: "80134",
+    example: "80202",
     parse: (v) => {
       const z = typeof v === "number" ? String(v).padStart(5, "0") : typeof v === "string" ? v.trim() : "";
       if (!/^\d{5}$/.test(z)) return { ok: false, problem: "must be a 5-digit ZIP code" };

@@ -15,7 +15,7 @@ export type Search = {
 export const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
 // Turns raw URL/body parameters into a validated household and ranked plans. Both the page and
-// the explain route use this, so the explanation is always computed from server-side numbers.
+// the engine use this, so figures are always computed from server-side numbers.
 export function resolveQuery(sp: Search) {
   const age = clamp(Number(sp.age ?? 45) || 45, 18, 64);
   const spouse = sp.spouse?.trim() ? clamp(Number(sp.spouse) || 0, 18, 64) : null;

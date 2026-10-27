@@ -18,7 +18,7 @@ The tools keep no state: every call carries the full 'answers' object.
 - age (whole number): How old is the main applicant? Example: 45
 - spouse_age (whole number or null): Is a spouse or partner on the plan? If so, their age; otherwise null. Example: 43, or null for none
 - children_ages (list of whole numbers): Are any children or other dependents on the plan? List their ages; use an empty list for none. Example: [4, 6, 8], or [] for none
-- zip (5-digit ZIP): What is their Colorado home ZIP code? Example: 80134
+- zip (5-digit ZIP): What is their Colorado home ZIP code? Example: 80202
 - county_fips (county code): That ZIP code spans counties that are priced differently. Which county do they live in?
 - tobacco (yes/no): Does anyone on the plan use tobacco? (Optional; defaults to no.)
 - household_income (dollars per year or null): What is the household's expected income this year (before tax, including all earners)? This only checks whether they might qualify for premium credits. They may skip it (null). Example: 85000, or null to skip

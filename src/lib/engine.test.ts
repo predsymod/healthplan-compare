@@ -6,10 +6,10 @@ import { POST as mcp } from "../app/mcp/route";
 
 const answers = {
   coverage: "none",
-  age: 45,
-  spouse_age: 43,
-  children_ages: [4, 6, 8],
-  zip: "80134",
+  age: 40,
+  spouse_age: 38,
+  children_ages: [5, 7, 9],
+  zip: "80202",
   household_income: 90000,
   expected_care: "major",
 };
@@ -23,7 +23,7 @@ describe("rankResults", () => {
   it("agrees with the ranking used by the web page", () => {
     const r = rankResults({ ...answers, household_income: null }, { limit: 3 });
     if (r.status !== "ready") throw new Error("not ready");
-    const direct = rankFor({ household: { adults: [45, 43], children: [4, 6, 8] }, zip: "80134", tobacco: false });
+    const direct = rankFor({ household: { adults: [40, 38], children: [5, 7, 9] }, zip: "80202", tobacco: false });
     expect(r.result.plansAvailable).toBe(direct.rows.length);
     const worst = Math.min(...direct.rows.map((x) => x.totals.worst!));
     expect(r.result.bestBy.worst!.perYear.worst).toBe(Math.round(worst));
