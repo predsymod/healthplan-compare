@@ -5,6 +5,7 @@ It exposes three stateless tools over MCP and plain REST. No login or key is nee
 
 ## Endpoints
 REST: POST https://healthplan-compare.vercel.app/api/engine/<tool> with a JSON body (Content-Type: application/json).
+REST by GET, for clients that can only fetch URLs: https://healthplan-compare.vercel.app/api/engine/<tool>?<fields>, where each answer field below is a query parameter (children_ages and plan_ids are comma-separated; use none for no spouse or to skip income). rank_plans also takes sort, limit, metal, type, insurer, hsa_only and max_monthly_premium.
 MCP (streamable HTTP, stateless JSON-RPC 2.0): POST https://healthplan-compare.vercel.app/mcp with the methods initialize, tools/list and tools/call.
 
 ## Tools
@@ -26,6 +27,7 @@ The tools keep no state: every call carries the full 'answers' object.
 
 ## Example
 curl -s -X POST https://healthplan-compare.vercel.app/api/engine/next_question -H "Content-Type: application/json" -d '{"answers":{}}'
+https://healthplan-compare.vercel.app/api/engine/rank_plans?age=40&spouse_age=38&children_ages=5,7,9&zip=80202&household_income=90000&expected_care=ongoing
 
 ## About the results
 Every response carries its caveats and usageRules. The figures are educational estimates, not advice or a recommendation of any plan.

@@ -197,6 +197,23 @@ describe("tools and MCP endpoint", () => {
     expect(r.json.result.isError).toBe(false);
   });
 
+  it("serves the tools over GET with query parameters", async () => {
+    const { GET } = await import("../app/api/engine/[tool]/route");
+    const ctx = { params: Promise.resolve({ tool: "rank_plans" }) };
+    const q = "age=40&spouse_age=38&children_ages=5,7,9&zip=80202&household_income=90000&expected_care=ongoing&limit=3";
+    const res = await GET(new Request(`http://x/api/engine/rank_plans?${q}`), ctx);
+    const out = await res.json();
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(out.status).toBe("ready");
+    expect(out.result.plans).toHaveLength(3);
+    const post = rankResults({ coverage: "none", age: 40, spouse_age: 38, children_ages: [5, 7, 9], zip: "80202", household_income: 90000, expected_care: "ongoing" }, { limit: 3 });
+    expect(out.result.plans.map((p: { id: string }) => p.id)).toEqual(post.status === "ready" ? post.result.plans.map((p) => p.id) : []);
+    const none = await GET(new Request("http://x/api/engine/next_question?age=40&spouse_age=none"), { params: Promise.resolve({ tool: "next_question" }) });
+    expect((await none.json()).status).toBe("ask");
+    const docs = await GET(new Request("http://x/api/engine/rank_plans"), ctx);
+    expect(await docs.text()).toMatch(/REST by GET/);
+  });
+
   it("returns an error for an unknown method", async () => {
     const r = await rpc({ jsonrpc: "2.0", id: 4, method: "nope" });
     expect(r.json.error.code).toBe(-32601);

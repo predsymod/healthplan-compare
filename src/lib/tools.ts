@@ -30,6 +30,7 @@ export function apiDocs(origin: string): string {
     "",
     "## Endpoints",
     `REST: POST ${origin}/api/engine/<tool> with a JSON body (Content-Type: application/json).`,
+    `REST by GET, for clients that can only fetch URLs: ${origin}/api/engine/<tool>?<fields>, where each answer field below is a query parameter (children_ages and plan_ids are comma-separated; use none for no spouse or to skip income). rank_plans also takes sort, limit, metal, type, insurer, hsa_only and max_monthly_premium.`,
     `MCP (streamable HTTP, stateless JSON-RPC 2.0): POST ${origin}/mcp with the methods initialize, tools/list and tools/call.`,
     "",
     "## Tools",
@@ -43,6 +44,7 @@ export function apiDocs(origin: string): string {
     "",
     "## Example",
     `curl -s -X POST ${origin}/api/engine/next_question -H "Content-Type: application/json" -d '{"answers":{}}'`,
+    `${origin}/api/engine/rank_plans?age=40&spouse_age=38&children_ages=5,7,9&zip=80202&household_income=90000&expected_care=ongoing`,
     "",
     "## About the results",
     "Every response carries its caveats and usageRules. The figures are educational estimates, not advice or a recommendation of any plan.",
@@ -152,6 +154,31 @@ export const TOOLS: Tool[] = [
     run: (args) => comparePlans(args.answers, asArray(args.plan_ids) ?? []),
   },
 ];
+
+const NONE = /^(null|none)$/i;
+const list = (v: string) => v.split(",").map((s) => s.trim()).filter(Boolean);
+
+// Flat query parameters become the same arguments as the POST body, for clients that can only fetch URLs.
+export function queryArgs(sp: URLSearchParams): Record<string, unknown> {
+  const answers: Record<string, unknown> = {};
+  for (const f of FIELDS) {
+    const v = sp.get(f.name);
+    if (v !== null) answers[f.name] = NONE.test(v) ? null : v;
+  }
+  const filter: Record<string, unknown> = {};
+  if (sp.has("metal")) filter.metal = list(sp.get("metal")!);
+  if (sp.has("type")) filter.type = list(sp.get("type")!);
+  if (sp.has("insurer")) filter.insurer = sp.get("insurer");
+  if (sp.get("hsa_only") === "true") filter.hsa_only = true;
+  if (sp.has("max_monthly_premium")) filter.max_monthly_premium = Number(sp.get("max_monthly_premium"));
+  return {
+    answers,
+    sort: sp.get("sort") ?? undefined,
+    limit: sp.has("limit") ? Number(sp.get("limit")) : undefined,
+    plan_ids: sp.has("plan_ids") ? list(sp.get("plan_ids")!) : undefined,
+    filter,
+  };
+}
 
 export function callTool(name: string, args: unknown): { ok: true; result: unknown } | { ok: false; error: string } {
   const tool = TOOLS.find((t) => t.name === name);
