@@ -9,6 +9,8 @@ export type Search = {
   zip?: string;
   county?: string;
   tobacco?: string;
+  income?: string;
+  care?: string;
   sort?: string;
 };
 

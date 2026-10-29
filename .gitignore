@@ -10,3 +10,6 @@ __pycache__/
 tsconfig.tsbuildinfo
 
 .vercel
+# stray PowerShell redirect artifacts
+$null
+null

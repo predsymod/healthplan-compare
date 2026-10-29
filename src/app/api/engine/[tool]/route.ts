@@ -1,5 +1,5 @@
 import { allow } from "@/lib/limit";
-import { apiDocs, callTool, queryArgs } from "@/lib/tools";
+import { apiDocs, callTool, getBody, queryArgs } from "@/lib/tools";
 
 // Plain REST version of the same tools, for agents and apps that do not speak MCP.
 export const runtime = "nodejs";
@@ -33,7 +33,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ tool: string }>
   if (!allow(req)) return Response.json({ error: "Too many requests." }, { status: 429, headers: { ...CORS, ...NO_STORE } });
   const { tool } = await ctx.params;
   const r = callTool(tool, queryArgs(url.searchParams));
-  return Response.json(r.ok ? r.result : { error: r.error }, { status: r.ok ? 200 : 400, headers: { ...CORS, ...NO_STORE } });
+  const headers = { ...CORS, ...NO_STORE };
+  if (!r.ok) return Response.json({ error: r.error }, { status: 400, headers });
+  const { body, type } = getBody(url.origin, tool, r.result, url.searchParams);
+  return new Response(body, { headers: { ...headers, "Content-Type": type } });
 }
 
 export function OPTIONS() {

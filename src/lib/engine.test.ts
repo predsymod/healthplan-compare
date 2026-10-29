@@ -201,7 +201,7 @@ describe("tools and MCP endpoint", () => {
     const { GET } = await import("../app/api/engine/[tool]/route");
     const ctx = { params: Promise.resolve({ tool: "rank_plans" }) };
     const q = "age=40&spouse_age=38&children_ages=5,7,9&zip=80202&household_income=90000&expected_care=ongoing&limit=3";
-    const res = await GET(new Request(`http://x/api/engine/rank_plans?${q}`), ctx);
+    const res = await GET(new Request(`http://x/api/engine/rank_plans?${q}&format=json`), ctx);
     const out = await res.json();
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(out.status).toBe("ready");
@@ -209,7 +209,29 @@ describe("tools and MCP endpoint", () => {
     const post = rankResults({ coverage: "none", age: 40, spouse_age: 38, children_ages: [5, 7, 9], zip: "80202", household_income: 90000, expected_care: "ongoing" }, { limit: 3 });
     expect(out.result.plans.map((p: { id: string }) => p.id)).toEqual(post.status === "ready" ? post.result.plans.map((p) => p.id) : []);
     const none = await GET(new Request("http://x/api/engine/next_question?age=40&spouse_age=none"), { params: Promise.resolve({ tool: "next_question" }) });
-    expect((await none.json()).status).toBe("ask");
+    const ask = await none.json();
+    expect(ask.status).toBe("ask");
+    expect(ask.continueUrl).toBe("http://x/api/engine/next_question/age/40/spouse_age/none/");
+
+    // by default a finished ranking comes back as formatted tables, with a ready-made compare link
+    const md = await GET(new Request(`http://x/api/engine/rank_plans?${q}`), ctx);
+    expect(md.headers.get("content-type")).toMatch(/text\/markdown/);
+    const text = await md.text();
+    expect(text).toMatch(/### Cheapest plan for each kind of year/);
+    expect(text).toMatch(/\| # \| Plan \| Premium \(per month\)/);
+    expect(text).toMatch(/api\/engine\/compare_plans\/age\/40\/spouse_age\/38\/children_ages\/5,7,9\/zip\/80202\/household_income\/90000\/expected_care\/ongoing\/plan_ids\//);
+    expect(text).toMatch(/after an estimated premium tax credit/);
+
+    const cmp = await GET(new Request(`http://x/api/engine/compare_plans?${q}&plan_ids=${out.result.plans.slice(0, 2).map((p: { id: string }) => p.id)}`), { params: Promise.resolve({ tool: "compare_plans" }) });
+    expect(await cmp.text()).toMatch(/### Difference from/);
+    // a household with no children uses children_ages=none and must still rank
+    const noKids = await GET(new Request("http://x/api/engine/rank_plans?age=40&spouse_age=none&children_ages=none&zip=80202&county_fips=08031&household_income=none&expected_care=little&format=json"), ctx);
+    expect((await noKids.json()).status).toBe("ready");
+    // the path form is equivalent to the query form
+    const kv = "age/40/spouse_age/38/children_ages/5,7,9/zip/80202/household_income/90000/expected_care/ongoing/limit/3/format/json";
+    const pathGet = (await import("../app/api/engine/[tool]/[...kv]/route")).GET;
+    const viaPath = await pathGet(new Request(`http://x/api/engine/rank_plans/${kv}`), { params: Promise.resolve({ tool: "rank_plans", kv: kv.split("/") }) });
+    expect((await viaPath.json()).result.plans.map((p: { id: string }) => p.id)).toEqual(out.result.plans.map((p: { id: string }) => p.id));
     const docs = await GET(new Request("http://x/api/engine/rank_plans"), ctx);
     expect(await docs.text()).toMatch(/REST by GET/);
   });

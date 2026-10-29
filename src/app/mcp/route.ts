@@ -1,5 +1,5 @@
 import { allow } from "@/lib/limit";
-import { apiDocs, callTool, INSTRUCTIONS, TOOLS } from "@/lib/tools";
+import { apiDocs, callTool, INSTRUCTIONS, mcpContent, TOOLS } from "@/lib/tools";
 
 // Remote MCP server (streamable HTTP, stateless JSON responses). No secrets are used here.
 export const runtime = "nodejs";
@@ -38,7 +38,7 @@ function handle(m: Rpc) {
     case "tools/call": {
       const r = callTool(String(m.params?.name ?? ""), m.params?.arguments);
       return ok(m.id, {
-        content: [{ type: "text", text: JSON.stringify(r.ok ? r.result : { error: r.error }) }],
+        content: mcpContent(r.ok ? r.result : { error: r.error }),
         isError: !r.ok,
       });
     }

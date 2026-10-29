@@ -3,6 +3,7 @@ import { lookupZip, pickCounty, serviceAreasFor } from "./geo";
 import { planLabel } from "./format";
 import { householdSize, rankPlans, SCENARIOS, sortBy, type Household, type Ranked, type Scenario } from "./rank";
 import { estimateCredit, screenSubsidy, type SubsidyScreen } from "./subsidy";
+import { presentCompare, presentRank } from "./present";
 import { nextStep, type Answers, type Care } from "./tree";
 
 // Prices every standard plan sold in the household's county. Used by the web page and by the agent tools.
@@ -67,7 +68,8 @@ export const SCENARIO_MEANING: Record<Scenario, string> = Object.fromEntries(
   SCENARIOS.map((s) => [s.key, `${s.label}: ${s.help}`]),
 ) as Record<Scenario, string>;
 
-const caveats = (credited: boolean) => [
+const caveats = (credited: boolean, planYear: string) => [
+  `These are ${planYear} plan-year prices and plans. If you are enrolling for a later plan year, the plans and prices will differ: check Connect for Health Colorado for the current ones before enrolling.`,
   "These are estimates for educational use, not advice or a recommendation of any plan.",
   credited
     ? "Prices are after an ESTIMATED premium tax credit. The real credit depends on final modified adjusted gross income, any job-based coverage offer, and who is on the tax return, and it is settled when you file taxes. Colorado state subsidies are not included."
@@ -171,6 +173,11 @@ function priced(a: Answers): Priced {
   };
 }
 
+// The winner of one view, without repeating every figure (the full row is in `plans` or from compare_plans).
+export type BestPlan = { id: string; name: string; metal: string; type: string; monthlyPremium: number; perYear: Record<Scenario, number | null> };
+
+const bestOf = (p: PlanSummary): BestPlan => ({ id: p.id, name: p.name, metal: p.metal, type: p.type, monthlyPremium: p.monthlyPremium, perYear: p.perYear });
+
 export type RankResult = {
   household: { adults: number[]; children: number[]; size: number };
   location: { zip: string; county: string; ratingArea: number };
@@ -182,11 +189,13 @@ export type RankResult = {
   subsidyScreen: SubsidyScreen | null;
   subsidyEstimate: SubsidyEstimate | null;
   leadWith: { scenario: Scenario; meaning: string };
-  bestBy: Record<string, PlanSummary | null>;
+  bestBy: Record<string, BestPlan | null>;
   plans: PlanSummary[];
   scenarioMeanings: Record<string, string>;
   caveats: string[];
   assumptions: string[];
+  // Markdown tables built from the same figures, ready to show the user.
+  presentation: string;
 };
 
 // Runs the whole pipeline for a finished intake. Returns the next question instead when the intake is incomplete.
@@ -204,16 +213,14 @@ export function rankResults(
   const matching = applyFilter(rows, opts.filter);
   const limit = Math.min(Math.max(opts.limit ?? 5, 1), 15);
 
-  const bestBy: Record<string, PlanSummary | null> = {};
+  const bestBy: Record<string, BestPlan | null> = {};
   for (const s of SCENARIOS) {
     const top = sortBy(matching, s.key)[0];
-    bestBy[s.key] = top ? summarize(top) : null;
+    bestBy[s.key] = top ? bestOf(summarize(top)) : null;
   }
   const household = householdOf(a);
 
-  return {
-    status: "ready",
-    result: {
+  const result: Omit<RankResult, "presentation"> = {
       household: { ...household, size: householdSize(household) },
       location: { zip: a.zip!, county: county!.name, ratingArea: county!.area },
       planYear: meta.planYear,
@@ -227,10 +234,10 @@ export function rankResults(
       bestBy,
       plans: sortBy(matching, sortKey).slice(0, limit).map(summarize),
       scenarioMeanings: SCENARIO_MEANING,
-      caveats: [...caveats(!!estimate), meta.note].filter(Boolean),
+      caveats: [...caveats(!!estimate, meta.planYear), meta.note].filter(Boolean),
       assumptions: step.assumptions,
-    },
   };
+  return { status: "ready", result: { ...result, presentation: presentRank(result) } };
 }
 
 // Side-by-side numbers for the plans the user is weighing, with the exact differences from the first plan.
@@ -255,13 +262,16 @@ export function comparePlans(raw: unknown, planIds: string[]) {
         ),
       }))
     : [];
+  const priceBasis = estimate ? "after estimated premium tax credit" : "before any premium tax credit";
+  const cav = caveats(!!estimate, loadState("co").meta.planYear);
   return {
     status: "ready" as const,
-    priceBasis: estimate ? "after estimated premium tax credit" : "before any premium tax credit",
+    priceBasis,
     plans,
     differences,
     unknownPlanIds: missing,
     note: "Differences are the second plan minus the first plan; positive means it costs more.",
-    caveats: caveats(!!estimate),
+    caveats: cav,
+    presentation: presentCompare({ priceBasis, plans, differences, unknownPlanIds: missing, caveats: cav }),
   };
 }

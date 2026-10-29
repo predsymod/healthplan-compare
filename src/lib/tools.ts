@@ -15,6 +15,7 @@ export const INSTRUCTIONS = [
   "Only quote dollar figures that the tools return, exactly as returned, and say whether each is per month or per year. Do not do your own premium or cost arithmetic. If asked for a number the tools did not return, say it is not available.",
   "Always pass on the caveats the tools return. Check priceBasis: when it says 'after estimated premium tax credit', say the prices include an estimated credit (and explain it from subsidyEstimate, including any cost-sharing reduction on Silver plans); when it says 'before any premium tax credit', say prices are before subsidies. Costs assume in-network care.",
   "Treat the household details the user gives you (ages, children, ZIP code, income, health needs) as private: use them only for this task and do not save them to long-term memory unless the user asks you to.",
+  "When rank_plans or compare_plans returns, its first content block is a formatted markdown answer (tables with plan names, units and caveats). Show those tables to the user first, as returned, then add a short plain-language summary of the tradeoffs. Do not re-type the figures into another layout or leave the tables out; use the JSON block for follow-up questions.",
   "Explain tradeoffs between the views: premium only, light year, managing a condition, big year, and worst case. The cheapest plan changes between them, which is the point.",
 ].join("\n");
 
@@ -30,7 +31,7 @@ export function apiDocs(origin: string): string {
     "",
     "## Endpoints",
     `REST: POST ${origin}/api/engine/<tool> with a JSON body (Content-Type: application/json).`,
-    `REST by GET, for clients that can only fetch URLs: ${origin}/api/engine/<tool>?<fields>, where each answer field below is a query parameter (children_ages and plan_ids are comma-separated; use none for no spouse or to skip income). rank_plans also takes sort, limit, metal, type, insurer, hsa_only and max_monthly_premium.`,
+    `REST by GET, for clients that can only fetch URLs: ${origin}/api/engine/<tool>/<field>/<value>/<field>/<value>/..., where each answer field below is a path pair (children_ages and plan_ids are comma-separated; use none for no spouse or to skip income). The same fields also work as a query string (?field=value&...), but some fetch tools drop query strings, so prefer the path form. rank_plans also takes sort, limit, metal, type, insurer, hsa_only and max_monthly_premium. A finished rank_plans or compare_plans GET returns formatted markdown tables (add format/json for the raw figures); an unfinished one returns the next questions plus a continueUrl that already carries the answers so far.`,
     `MCP (streamable HTTP, stateless JSON-RPC 2.0): POST ${origin}/mcp with the methods initialize, tools/list and tools/call.`,
     "",
     "## Tools",
@@ -44,7 +45,7 @@ export function apiDocs(origin: string): string {
     "",
     "## Example",
     `curl -s -X POST ${origin}/api/engine/next_question -H "Content-Type: application/json" -d '{"answers":{}}'`,
-    `${origin}/api/engine/rank_plans?age=40&spouse_age=38&children_ages=5,7,9&zip=80202&household_income=90000&expected_care=ongoing`,
+    `${origin}/api/engine/rank_plans/age/40/spouse_age/38/children_ages/5,7,9/zip/80202/household_income/90000/expected_care/ongoing`,
     "",
     "## About the results",
     "Every response carries its caveats and usageRules. The figures are educational estimates, not advice or a recommendation of any plan.",
@@ -74,6 +75,7 @@ export const USAGE_RULES = [
   "Educational estimate only: do not recommend a plan or give medical or financial advice.",
   "Quote dollar figures exactly as returned and say whether each is per month or per year; do not do your own cost arithmetic.",
   "Pass on the caveats in this result.",
+  "Show the markdown tables in `presentation` to the user first, as returned, then summarise the tradeoffs in a few sentences.",
   "Treat the household details as private and do not save them to long-term memory unless the user asks.",
 ];
 
@@ -163,7 +165,9 @@ export function queryArgs(sp: URLSearchParams): Record<string, unknown> {
   const answers: Record<string, unknown> = {};
   for (const f of FIELDS) {
     const v = sp.get(f.name);
-    if (v !== null) answers[f.name] = NONE.test(v) ? null : v;
+    if (v === null) continue;
+    // "none" means no spouse or no income, and for children it means an empty list
+    answers[f.name] = NONE.test(v) ? (f.name === "children_ages" ? [] : null) : v;
   }
   const filter: Record<string, unknown> = {};
   if (sp.has("metal")) filter.metal = list(sp.get("metal")!);
@@ -190,4 +194,71 @@ export function callTool(name: string, args: unknown): { ok: true; result: unkno
     console.error("tool failed", name, e instanceof Error ? e.message : "unknown");
     return { ok: false, error: "The tool failed. Check the arguments and try again." };
   }
+}
+
+type Obj = Record<string, unknown>;
+const isObj = (v: unknown): v is Obj => !!v && typeof v === "object" && !Array.isArray(v);
+
+// rank_plans nests its payload under `result`; compare_plans carries it at the top level.
+export function presentationOf(r: unknown): string | undefined {
+  if (!isObj(r)) return undefined;
+  const inner = isObj(r.result) ? r.result : r;
+  return typeof inner.presentation === "string" ? inner.presentation : undefined;
+}
+
+function withoutPresentation(r: Obj): Obj {
+  const strip = ({ presentation: _p, ...rest }: Obj) => rest;
+  return isObj(r.result) ? { ...r, result: strip(r.result) } : strip(r);
+}
+
+// MCP content: the formatted tables first, so a client that shows only the first block still shows a clean answer,
+// then the JSON for follow-up calls (plan ids, exact figures).
+export function mcpContent(result: unknown): { type: "text"; text: string }[] {
+  const md = presentationOf(result);
+  if (md && isObj(result)) return [{ type: "text", text: md }, { type: "text", text: JSON.stringify(withoutPresentation(result)) }];
+  return [{ type: "text", text: JSON.stringify(result) }];
+}
+
+// GET URLs are written as path segments (/api/engine/<tool>/age/40/zip/80202/), not query strings: some assistants'
+// fetch tools drop query strings they build themselves but keep the path.
+const seg = (k: string, v: string) => `${encodeURIComponent(k)}/${encodeURIComponent(v).replace(/%2C/gi, ",")}/`;
+
+// A URL that carries the answers collected so far, ending where the next field/value pair can be appended.
+export function continueUrl(origin: string, tool: string, collected: unknown): string {
+  let path = "";
+  if (isObj(collected)) {
+    for (const [k, v] of Object.entries(collected)) {
+      if (v === undefined) continue;
+      path += seg(k, v === null ? "none" : Array.isArray(v) ? (v.length ? v.join(",") : "none") : String(v));
+    }
+  }
+  return `${origin}/api/engine/${tool}/${path}`;
+}
+
+function compareUrl(origin: string, search: URLSearchParams, ids: string[]): string {
+  let path = "";
+  for (const f of FIELDS) if (search.has(f.name)) path += seg(f.name, search.get(f.name)!);
+  return `${origin}/api/engine/compare_plans/${path}${seg("plan_ids", ids.join(","))}`;
+}
+
+// What a GET returns: the formatted markdown for finished rankings, JSON (with a continueUrl) for questions.
+export function getBody(origin: string, tool: string, result: unknown, search: URLSearchParams): { body: string; type: string } {
+  const md = presentationOf(result);
+  if (md && search.get("format") !== "json" && isObj(result)) {
+    const rules = Array.isArray(result.usageRules) ? (result.usageRules as string[]) : [];
+    const ids = isObj(result.result) && Array.isArray(result.result.plans) ? (result.result.plans as { id: string }[]).slice(0, 3).map((p) => p.id) : [];
+    return {
+      type: "text/markdown; charset=utf-8",
+      body: [
+        md,
+        ...(ids.length > 1 ? ["", `Compare the top ${ids.length}: ${compareUrl(origin, search, ids)}`] : []),
+        `Raw figures as JSON: add format/json to this request's URL.`,
+        "",
+        "**Usage rules for this tool:**",
+        ...rules.map((r) => `- ${r}`),
+      ].join("\n"),
+    };
+  }
+  const out = isObj(result) && result.status === "ask" ? { ...result, continueUrl: continueUrl(origin, tool, result.collected) } : result;
+  return { type: "application/json", body: JSON.stringify(out) };
 }
